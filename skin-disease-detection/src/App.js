@@ -330,29 +330,57 @@ const App = () => {
         setDiagnosisErrorMessage('');
 
         try {
-            // Simulate analysis for demo - replace with real API
-            await new Promise(resolve => setTimeout(resolve, 3000));
-
-            // Mock diagnosis result
-            const mockResults = [
-                {
-                    diseaseName: "Acne",
-                    confidenceScore: 87,
-                    description: "Common inflammatory skin condition affecting hair follicles and sebaceous glands. Usually appears as red bumps, whiteheads, or blackheads on face, chest, and back.",
-                    disclaimer: "This AI analysis is for educational purposes only. Please consult a qualified dermatologist for proper medical diagnosis and treatment."
-                },
-                {
-                    diseaseName: "Eczema", 
-                    confidenceScore: 75,
-                    description: "Chronic inflammatory skin condition causing red, itchy, and dry patches. Often triggered by allergens, stress, or environmental factors.",
-                    disclaimer: "This AI analysis is for educational purposes only. Please consult a qualified dermatologist for proper medical diagnosis and treatment."
-                },
-                {
-                    diseaseName: "Healthy Skin",
-                    confidenceScore: 92,
-                    description: "No significant skin condition detected. Skin appears to be in good health with normal texture and coloration.",
-                    disclaimer: "Continue with good skincare practices and regular dermatological check-ups for preventive care."
+    const base64Data = imageSrc.split(',')[21];
+    
+    const prompt = `Analyze this skin image to identify possible skin conditions. Respond with a JSON object containing 'diseaseName' (string), 'confidenceScore' (number 0-100), 'description' (string), and 'disclaimer' (string). If no specific condition is identified, use 'Healthy Skin' as the disease name. Provide medical accuracy based on dermatological knowledge.`;
+    
+    const payload = {
+        contents: [
+            {
+                role: "user", 
+                parts: [
+                    { text: prompt },
+                    {
+                        inlineData: {
+                            mimeType: "image/jpeg",
+                            data: base64Data
+                        }
+                    }
+                ]
+            }
+        ],
+        generationConfig: {
+            responseMimeType: "application/json",
+            responseSchema: {
+                type: "OBJECT",
+                properties: {
+                    "diseaseName": { "type": "STRING" },
+                    "confidenceScore": { "type": "INTEGER" },
+                    "description": { "type": "STRING" },
+                    "disclaimer": { "type": "STRING" }
                 }
+            }
+        }
+    };
+    
+    const apiKey = "AIzaSyDbVaM34izzzi7I65DbYBsH3ssNIfiSaC0"; // Replace with your actual API key
+    const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=${apiKey}`;
+
+    const response = await fetch(apiUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+    });
+
+    const result = await response.json();
+    const jsonText = result.candidates.content.parts.text;
+    const parsedDiagnosis = JSON.parse(jsonText);
+    setDiagnosis(parsedDiagnosis);
+
+} catch (error) {
+    console.error("Analysis failed:", error);
+    setDiagnosisErrorMessage(t.analysisFailed);
+}
             ];
 
             // Random selection for demo
