@@ -26,9 +26,11 @@ jobs:
         node-version: '18'
 
     - name: Install dependencies
+      working-directory: ./skin-disease-detection
       run: npm install
 
     - name: Build project
+      working-directory: ./skin-disease-detection
       run: npm run build
 
     - name: Setup Pages
@@ -37,7 +39,7 @@ jobs:
     - name: Upload artifact
       uses: actions/upload-pages-artifact@v3
       with:
-        path: ./build
+        path: ./skin-disease-detection/build
 
     - name: Deploy to GitHub Pages
       uses: actions/deploy-pages@v4
