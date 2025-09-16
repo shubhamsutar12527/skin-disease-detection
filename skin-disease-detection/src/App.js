@@ -1,5 +1,4 @@
-# Create a 100% working, simple App.js that will definitely build and work
-simple_working_app = '''import React, { useState, useRef } from 'react';
+import React, { useState, useRef } from 'react';
 
 function App() {
   const [image, setImage] = useState(null);
@@ -87,7 +86,7 @@ function App() {
           fontSize: '2.5rem',
           marginBottom: '10px'
         }}>
-          🩺 Arogya Mitra
+          Arogya Mitra
         </h1>
         <p style={{
           color: '#666',
@@ -152,7 +151,7 @@ function App() {
             boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
           }}
         >
-          📁 Upload Image
+          Upload Image
         </button>
 
         <button
@@ -169,7 +168,7 @@ function App() {
             boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
           }}
         >
-          {loading ? '🔍 Analyzing...' : '🧠 Analyze with AI'}
+          {loading ? 'Analyzing...' : 'Analyze with AI'}
         </button>
       </div>
 
@@ -182,7 +181,7 @@ function App() {
           borderRadius: '8px',
           marginBottom: '20px'
         }}>
-          <strong>❌ Error:</strong> {error}
+          <strong>Error:</strong> {error}
         </div>
       )}
 
@@ -199,7 +198,7 @@ function App() {
             marginBottom: '15px',
             fontSize: '1.5rem'
           }}>
-            📊 AI Analysis Results
+            AI Analysis Results
           </h3>
           
           <div style={{
@@ -238,7 +237,7 @@ function App() {
             marginTop: '15px',
             fontSize: '0.9rem'
           }}>
-            <strong>⚠️ Important:</strong> This is for educational purposes only. 
+            <strong>Important:</strong> This is for educational purposes only. 
             Always consult a qualified healthcare professional for proper medical advice.
           </div>
         </div>
@@ -247,19 +246,4 @@ function App() {
   );
 }
 
-export default App;'''
-
-# Save the file
-with open('SimpleApp.js', 'w', encoding='utf-8') as f:
-    f.write(simple_working_app)
-
-print("✅ SUPER SIMPLE App.js Created!")
-print("\n🎯 This version is:")
-print("• ✅ 100% Clean syntax - NO errors")
-print("• ✅ Uses your real API key")
-print("• ✅ Simple, guaranteed to work")
-print("• ✅ Beautiful interface")
-print("• ✅ Real AI analysis")
-print("• ✅ Only 150 lines - easy to debug")
-print("\n📁 File: SimpleApp.js")
-print("🚀 Copy this and it will work 100%!")
+export default App;
