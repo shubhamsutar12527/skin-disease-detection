@@ -405,7 +405,7 @@ function App() {
                       color: '#6b7280'
                     }}>
                       <span>🕒 {result.timestamp}</span>
-                      <span>🤖 Powered by Gemini AI</span>
+                      <span>🤖 Powered by AI</span>
                     </div>
                   </div>
 
@@ -456,7 +456,7 @@ function App() {
           color: 'rgba(255,255,255,0.8)',
           fontSize: '0.9rem'
         }}>
-          <p>Made with ❤️ using Google Gemini AI • Advancing Healthcare Through Technology</p>
+          <p>Made with ❤️ using AI and Machine Learing • Advancing Healthcare Through Technology</p>
         </div>
       </div>
 
