@@ -1,5 +1,5 @@
-# Create the complete App.js file without any syntax errors
-app_js_complete = '''import React, { useState, useRef, useEffect } from 'react';
+# Create the complete App.js file with the user's API key already integrated
+app_js_with_api = """import React, { useState, useRef, useEffect } from 'react';
 import './App.css';
 
 // Language data
@@ -331,74 +331,62 @@ const App = () => {
         setDiagnosisErrorMessage('');
 
         try {
-    const base64Data = imageSrc.split(',')[1];
-    
-    const prompt = `Analyze this skin image to identify possible skin conditions. Respond with a JSON object containing 'diseaseName' (string), 'confidenceScore' (number 0-100), 'description' (string), and 'disclaimer' (string). If no specific condition is identified, use 'Healthy Skin' as the disease name. Provide medical accuracy based on dermatological knowledge.`;
-    
-    const payload = {
-        contents: [
-            {
-                role: "user",
-                parts: [
-                    { text: prompt },
+            const base64Data = imageSrc.split(',')[1];
+            
+            const prompt = `Analyze this skin image to identify possible skin conditions. Respond with a JSON object containing 'diseaseName' (string), 'confidenceScore' (number 0-100), 'description' (string), and 'disclaimer' (string). If no specific condition is identified, use 'Healthy Skin' as the disease name. Provide medical accuracy based on dermatological knowledge.`;
+            
+            const payload = {
+                contents: [
                     {
-                        inlineData: {
-                            mimeType: "image/jpeg",
-                            data: base64Data
+                        role: "user",
+                        parts: [
+                            { text: prompt },
+                            {
+                                inlineData: {
+                                    mimeType: "image/jpeg",
+                                    data: base64Data
+                                }
+                            }
+                        ]
+                    }
+                ],
+                generationConfig: {
+                    responseMimeType: "application/json",
+                    responseSchema: {
+                        type: "OBJECT",
+                        properties: {
+                            "diseaseName": { "type": "STRING" },
+                            "confidenceScore": { "type": "INTEGER" },
+                            "description": { "type": "STRING" },
+                            "disclaimer": { "type": "STRING" }
                         }
                     }
-                ]
-            }
-        ],
-        generationConfig: {
-            responseMimeType: "application/json",
-            responseSchema: {
-                type: "OBJECT",
-                properties: {
-                    "diseaseName": { "type": "STRING" },
-                    "confidenceScore": { "type": "INTEGER" },
-                    "description": { "type": "STRING" },
-                    "disclaimer": { "type": "STRING" }
                 }
+            };
+            
+            // Real Gemini API with your API key
+            const apiKey = "AIzaSyDbVaM34izzzi7I65DbYBsH3ssNIfiSaC0";
+            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=${apiKey}`;
+
+            const response = await fetch(apiUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
             }
-        }
-    };
-    
-    // 🔑 ADD YOUR API KEY HERE
-    const apiKey = "AIzaSyDbVaM34izzzi7I65DbYBsH3ssNIfiSaC0";
-    const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=${apiKey}`;
 
-    const response = await fetch(apiUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-    });
-
-    if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-    }
-
-    const result = await response.json();
-    
-    if (result.candidates && result.candidates[0] && result.candidates[0].content) {
-        const jsonText = result.candidates[0].content.parts[0].text;
-        const parsedDiagnosis = JSON.parse(jsonText);
-        setDiagnosis(parsedDiagnosis);
-    } else {
-        throw new Error("Invalid response from API");
-    }
-
-} catch (error) {
-    console.error("Analysis failed:", error);
-    setDiagnosisErrorMessage(t.analysisFailed);
-} finally {
-    setIsAnalyzing(false);
-}
-            ];
-
-            // Random selection for demo
-            const randomResult = mockResults[Math.floor(Math.random() * mockResults.length)];
-            setDiagnosis(randomResult);
+            const result = await response.json();
+            
+            if (result.candidates && result.candidates[0] && result.candidates[0].content) {
+                const jsonText = result.candidates[0].content.parts[0].text;
+                const parsedDiagnosis = JSON.parse(jsonText);
+                setDiagnosis(parsedDiagnosis);
+            } else {
+                throw new Error("Invalid response from API");
+            }
 
         } catch (error) {
             console.error("Analysis failed:", error);
@@ -418,37 +406,36 @@ const App = () => {
         setIsChatting(true);
 
         try {
-            // Simulate chatbot response - replace with real API
-            await new Promise(resolve => setTimeout(resolve, 2000));
+            // Enhanced chatbot with Gemini API
+            const prompt = `Provide a short and simple answer ${t.langInstruction} for a non-technical person about this skin health question: "${userMessage}". Answer in short sentences, like you would to a child or someone not familiar with complex medical terms.`;
             
-            const responses = {
-                en: [
-                    "For skin conditions, it's important to maintain good hygiene and use gentle skincare products.",
-                    "Drink plenty of water, eat nutritious foods, and protect your skin from sun exposure.",
-                    "If you notice any unusual changes in your skin, consult a dermatologist promptly.",
-                    "Regular moisturizing and gentle cleansing can help maintain healthy skin.",
-                    "Avoid touching your face frequently and always use clean hands when applying skincare products."
-                ],
-                hi: [
-                    "त्वचा की समस्याओं के लिए, अच्छी स्वच्छता बनाए रखना और कोमल स्किनकेयर उत्पादों का उपयोग करना महत्वपूर्ण है।",
-                    "भरपूर पानी पिएं, पौष्टिक भोजन करें, और अपनी त्वचा को धूप से बचाएं।",
-                    "यदि आप अपनी त्वचा में कोई असामान्य परिवर्तन देखते हैं, तो तुरंत त्वचा विशेषज्ञ से सलाह लें।",
-                    "नियमित मॉइस्चराइजिंग और कोमल सफाई स्वस्थ त्वचा को बनाए रखने में मदद कर सकती है।",
-                    "अपना चेहरा बार-बार छूने से बचें और स्किनकेयर उत्पादों को लगाते समय हमेशा साफ हाथों का उपयोग करें।"
-                ],
-                mr: [
-                    "त्वचेच्या समस्यांसाठी, चांगली स्वच्छता राखणे आणि सौम्य स्किनकेअर उत्पादने वापरणे महत्वाचे आहे।",
-                    "भरपूर पाणी प्या, पौष्टिक अन्न खा आणि तुमच्या त्वचेचे सूर्यापासून संरक्षण करा।",
-                    "तुम्हाला तुमच्या त्वचेत कोणतेही असामान्य बदल दिसल्यास, त्वरित त्वचा तज्ञांचा सल्ला घ्या।",
-                    "नियमित मॉइश्चरायझिंग आणि सौम्य साफसफाई निरोगी त्वचा राखण्यास मदत करू शकते।",
-                    "तुमचा चेहरा वारंवार स्पर्श करणे टाळा आणि स्किनकेअर उत्पादने लावताना नेहमी स्वच्छ हातांचा वापर करा।"
-                ]
+            const payload = {
+                contents: [{
+                    role: "user",
+                    parts: [{ text: prompt }]
+                }]
             };
-            
-            const responseArray = responses[locale] || responses.en;
-            const randomResponse = responseArray[Math.floor(Math.random() * responseArray.length)];
-            
-            setChatHistory(prevChat => [...prevChat, { role: 'bot', text: randomResponse }]);
+
+            const apiKey = "AIzaSyDbVaM34izzzi7I65DbYBsH3ssNIfiSaC0";
+            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=${apiKey}`;
+
+            const response = await fetch(apiUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+
+            const result = await response.json();
+            if (result.candidates && result.candidates.length > 0 && result.candidates[0].content) {
+                const botMessage = result.candidates[0].content.parts[0].text;
+                setChatHistory(prevChat => [...prevChat, { role: 'bot', text: botMessage }]);
+            } else {
+                setChatHistory(prevChat => [...prevChat, { role: 'bot', text: t.apiError }]);
+            }
 
         } catch (error) {
             console.error("Chatbot error:", error);
@@ -804,19 +791,21 @@ const App = () => {
     );
 };
 
-export default App;'''
+export default App;"""
 
-# Save the complete App.js file
-with open('App.js', 'w', encoding='utf-8') as f:
-    f.write(app_js_complete)
+# Save the complete App.js file with API key
+with open('App_with_API.js', 'w', encoding='utf-8') as f:
+    f.write(app_js_with_api)
 
-print("✅ Complete App.js file created successfully!")
-print("📁 File: App.js")
-print("📊 Size: {} lines".format(len(app_js_complete.split('\n'))))
-print("\nThis file includes:")
-print("• 🌐 Complete trilingual support (English, Hindi, Marathi)")
-print("• 📷 Camera capture and file upload functionality")
-print("• 🤖 AI analysis with mock results (ready for Gemini API)")
-print("• 💬 Multilingual chatbot")
-print("• 🎨 Modern responsive design")
-print("• ⚡ No syntax errors - ready to copy and paste!")
+print("🎉 Complete App.js file with your API key created successfully!")
+print("\n📁 File: App_with_API.js")
+print(f"📊 Size: {len(app_js_with_api.split())} lines")
+print(f"🔑 API Key: AIzaSyDbVaM34izzzi7I65DbYBsH3ssNIfiSaC0 (integrated)")
+print(f"📱 Features included:")
+print("• 🌐 Trilingual support (English, Hindi, Marathi)")
+print("• 📷 Camera capture and file upload")
+print("• 🤖 REAL Gemini AI analysis (no mock data)")  
+print("• 💬 REAL AI chatbot with multilingual responses")
+print("• 🎨 Modern gradient UI design")
+print("• ⚡ Ready to copy and paste!")
+print("\n🚀 This version will give you REAL AI results!")
