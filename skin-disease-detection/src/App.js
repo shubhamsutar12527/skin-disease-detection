@@ -1,8 +1,6 @@
-# Create the complete App.js file with the user's API key already integrated
-app_js_with_api = """import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import './App.css';
 
-// Language data
 const translations = {
     en: {
         title: "AI Skin Disease Detection",
@@ -237,10 +235,7 @@ const diseaseSymptoms = {
 const App = () => {
     const [locale, setLocale] = useState('en');
     const t = translations[locale];
-
     const [activeTab, setActiveTab] = useState('diagnosis');
-    
-    // Diagnosis states
     const [imageSrc, setImageSrc] = useState(null);
     const [isAnalyzing, setIsAnalyzing] = useState(false);
     const [diagnosis, setDiagnosis] = useState(null);
@@ -250,8 +245,6 @@ const App = () => {
     const canvasRef = useRef(null);
     const [isCameraActive, setIsCameraActive] = useState(false);
     const [currentCamera, setCurrentCamera] = useState('environment');
-
-    // Chatbot states
     const [chatHistory, setChatHistory] = useState([]);
     const [userMessage, setUserMessage] = useState('');
     const [isChatting, setIsChatting] = useState(false);
@@ -311,8 +304,6 @@ const App = () => {
             const capturedImage = canvasRef.current.toDataURL('image/jpeg');
             setImageSrc(capturedImage);
             setDiagnosis(null);
-
-            // Stop camera
             const stream = videoRef.current.srcObject;
             const tracks = stream.getTracks();
             tracks.forEach(track => track.stop());
@@ -325,31 +316,27 @@ const App = () => {
             setDiagnosisErrorMessage(t.uploadError);
             return;
         }
-
         setIsAnalyzing(true);
         setDiagnosis(null);
         setDiagnosisErrorMessage('');
 
         try {
             const base64Data = imageSrc.split(',')[1];
-            
             const prompt = `Analyze this skin image to identify possible skin conditions. Respond with a JSON object containing 'diseaseName' (string), 'confidenceScore' (number 0-100), 'description' (string), and 'disclaimer' (string). If no specific condition is identified, use 'Healthy Skin' as the disease name. Provide medical accuracy based on dermatological knowledge.`;
             
             const payload = {
-                contents: [
-                    {
-                        role: "user",
-                        parts: [
-                            { text: prompt },
-                            {
-                                inlineData: {
-                                    mimeType: "image/jpeg",
-                                    data: base64Data
-                                }
+                contents: [{
+                    role: "user",
+                    parts: [
+                        { text: prompt },
+                        {
+                            inlineData: {
+                                mimeType: "image/jpeg",
+                                data: base64Data
                             }
-                        ]
-                    }
-                ],
+                        }
+                    ]
+                }],
                 generationConfig: {
                     responseMimeType: "application/json",
                     responseSchema: {
@@ -364,7 +351,6 @@ const App = () => {
                 }
             };
             
-            // Real Gemini API with your API key
             const apiKey = "AIzaSyDbVaM34izzzi7I65DbYBsH3ssNIfiSaC0";
             const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=${apiKey}`;
 
@@ -406,7 +392,6 @@ const App = () => {
         setIsChatting(true);
 
         try {
-            // Enhanced chatbot with Gemini API
             const prompt = `Provide a short and simple answer ${t.langInstruction} for a non-technical person about this skin health question: "${userMessage}". Answer in short sentences, like you would to a child or someone not familiar with complex medical terms.`;
             
             const payload = {
@@ -453,7 +438,6 @@ const App = () => {
 
     const getSymptomsList = () => {
         if (!diagnosis || !diagnosis.diseaseName) return [];
-
         const diseaseName = diagnosis.diseaseName.toLowerCase();
         for (const key in diseaseSymptoms[locale]) {
             if (diseaseName.includes(key)) {
@@ -508,7 +492,6 @@ const App = () => {
                     </div>
                 </div>
 
-                {/* Tab Navigation */}
                 <div className="flex justify-center mb-8">
                     <div className="bg-gray-100 dark:bg-gray-700 p-1 rounded-2xl">
                         <button
@@ -534,7 +517,6 @@ const App = () => {
                     </div>
                 </div>
 
-                {/* Diagnosis Section */}
                 {activeTab === 'diagnosis' && (
                     <div className="space-y-8">
                         <div className="text-center">
@@ -548,7 +530,6 @@ const App = () => {
                             </div>
                         </div>
 
-                        {/* Photo Tips */}
                         <div className="bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 p-6 rounded-2xl border-2 border-blue-200 dark:border-blue-700">
                             <h3 className="text-xl font-bold text-blue-800 dark:text-blue-300 mb-4">{t.photoTips}</h3>
                             <div className="grid md:grid-cols-2 gap-3">
@@ -571,7 +552,6 @@ const App = () => {
                             </div>
                         </div>
 
-                        {/* Image Preview Area */}
                         <div className="relative w-full max-w-2xl mx-auto">
                             <div className="aspect-video bg-gradient-to-br from-gray-100 to-gray-200 dark:from-gray-700 dark:to-gray-600 rounded-3xl overflow-hidden shadow-2xl border-4 border-dashed border-gray-300 dark:border-gray-500 flex items-center justify-center">
                                 {imageSrc && !isCameraActive ? (
@@ -590,7 +570,6 @@ const App = () => {
                             </div>
                         </div>
 
-                        {/* Control Buttons */}
                         <div className="flex flex-wrap justify-center gap-4">
                             <input type="file" accept="image/*" onChange={handleImageUpload} ref={fileInputRef} className="hidden" />
                             <button 
@@ -624,7 +603,6 @@ const App = () => {
                             )}
                         </div>
 
-                        {/* Analyze Button */}
                         <div className="text-center">
                             <button
                                 onClick={analyzeImage}
@@ -649,7 +627,6 @@ const App = () => {
                             </button>
                         </div>
 
-                        {/* Error Message */}
                         {diagnosisErrorMessage && (
                             <div className="bg-red-50 dark:bg-red-900/30 border-l-4 border-red-500 text-red-700 dark:text-red-300 p-6 rounded-r-2xl">
                                 <div className="flex items-center">
@@ -662,7 +639,6 @@ const App = () => {
                             </div>
                         )}
 
-                        {/* Results */}
                         {diagnosis && (
                             <div className="space-y-8">
                                 <div className="bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-900/20 p-8 rounded-3xl shadow-2xl border-2 border-green-200 dark:border-green-700">
@@ -688,7 +664,6 @@ const App = () => {
                                     </div>
                                 </div>
 
-                                {/* Symptoms */}
                                 <div className="bg-gradient-to-r from-red-50 to-pink-50 dark:from-red-900/20 dark:to-pink-900/20 p-8 rounded-3xl shadow-2xl border-2 border-red-200 dark:border-red-700">
                                     <h2 className="text-3xl font-bold text-center mb-6 text-red-700 dark:text-red-400">{t.symptomsTitle}</h2>
                                     {getSymptomsList().length > 0 ? (
@@ -702,7 +677,6 @@ const App = () => {
                                     )}
                                 </div>
 
-                                {/* Precautions */}
                                 <div className="bg-gradient-to-r from-teal-50 to-cyan-50 dark:from-teal-900/20 dark:to-cyan-900/20 p-8 rounded-3xl shadow-2xl border-2 border-teal-200 dark:border-teal-700">
                                     <h2 className="text-3xl font-bold text-center mb-6 text-teal-700 dark:text-teal-400">{t.basicPrecautionsTitle}</h2>
                                     <p className="text-center text-teal-600 dark:text-teal-400 mb-6 text-lg">
@@ -717,7 +691,6 @@ const App = () => {
                     </div>
                 )}
 
-                {/* Chatbot Section */}
                 {activeTab === 'chatbot' && (
                     <div className="space-y-6">
                         <div className="text-center mb-6">
@@ -791,21 +764,4 @@ const App = () => {
     );
 };
 
-export default App;"""
-
-# Save the complete App.js file with API key
-with open('App_with_API.js', 'w', encoding='utf-8') as f:
-    f.write(app_js_with_api)
-
-print("🎉 Complete App.js file with your API key created successfully!")
-print("\n📁 File: App_with_API.js")
-print(f"📊 Size: {len(app_js_with_api.split())} lines")
-print(f"🔑 API Key: AIzaSyDbVaM34izzzi7I65DbYBsH3ssNIfiSaC0 (integrated)")
-print(f"📱 Features included:")
-print("• 🌐 Trilingual support (English, Hindi, Marathi)")
-print("• 📷 Camera capture and file upload")
-print("• 🤖 REAL Gemini AI analysis (no mock data)")  
-print("• 💬 REAL AI chatbot with multilingual responses")
-print("• 🎨 Modern gradient UI design")
-print("• ⚡ Ready to copy and paste!")
-print("\n🚀 This version will give you REAL AI results!")
+export default App;
