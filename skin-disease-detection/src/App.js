@@ -154,7 +154,14 @@ function App() {
       <Overlay />
       <header style={{ paddingTop: 28, textAlign:'center' }}>
         <h1 style={title}>
-          Arogya <span style={{color:'#22d3ee', textShadow:'0 0 14px #22d3ee'}}>Mantra</span>
+          <span style={{color:'#f5f7fa', textShadow:'0 0 10px rgba(255,255,255,0.25)'}}>Arogya</span>
+          {' '}
+          <span style={{
+            color:'#2ef4a6',
+            textShadow:'0 0 12px rgba(46,244,166,0.9), 0 0 26px rgba(46,244,166,0.55)'}}
+          >
+            Mantra
+          </span>
         </h1>
         <div style={subtitle}>AI Skin Health Interface</div>
         <div style={divider} />
@@ -274,7 +281,7 @@ var rootBg = {
   backgroundSize:'1000px 1000px, 1000px 1000px, 36px 36px, 36px 36px'
 };
 var centerWrap = { maxWidth:880, margin:'0 auto', padding:'0 14px 60px' };
-var title = { fontSize:52, fontWeight:900, letterSpacing:.4, color:'#e2faff', textShadow:'0 0 16px #22d3ee', margin:0 };
+var title = { fontSize:52, fontWeight:900, letterSpacing:.4, margin:0 };
 var subtitle = { marginTop:6, fontSize:14, opacity:.9, color:'#c7f9ff' };
 var divider = { height:3, width:240, margin:'16px auto 10px', background:'linear-gradient(90deg,#22d3ee,#14b8a6)', filter:'blur(.35px)', borderRadius:2, boxShadow:'0 0 14px #22d3ee' };
 
@@ -498,54 +505,4 @@ function Bubble(props){
         fontSize:14, lineHeight:1.5
       }}>
         {props.children}
-      </div>
-    </div>
-  );
-}
-
-var chatBox = {
-  height: 420, overflowY:'auto', border:'1px solid rgba(56,189,248,0.32)',
-  borderRadius:14, padding:14,
-  background:'linear-gradient(135deg, rgba(12,14,16,0.75), rgba(16,18,20,0.65))',
-  boxShadow:'0 0 22px rgba(34,211,238,0.20)'
-};
-var chatInput = {
-  flex:1, padding:'12px 14px', borderRadius:12,
-  border:'1px solid rgba(56,189,248,0.35)',
-  background:'rgba(12,14,16,0.6)', color:'#eafcff', outline:'none'
-};
-
-/* helpers */
-function toRGBA(hexColor, a){
-  if (hexColor.indexOf('rgb')===0) return hexColor;
-  var c = hexColor.replace('#','');
-  var n = parseInt(c,16);
-  var r=(n>>16)&255, g=(n>>8)&255, b=n&255;
-  var alpha = typeof a==='number' ? a : 1;
-  return 'rgba('+r+','+g+','+b+','+alpha+')';
-}
-function shade(hexColor){
-  var c = hexColor.replace('#','');
-  var n = parseInt(c,16);
-  var r=(n>>16)&255, g=(n>>8)&255, b=n&255;
-  function s(v){ return Math.max(0, v-28); }
-  return '#'+[s(r),s(g),s(b)].map(function(x){return x.toString(16).padStart(2,'0');}).join('');
-}
-
-var aboutList = {
-  margin:0, paddingLeft:18, lineHeight:1.65, color:'#d7fbff', fontSize:14
-};
-
-/* Keyframes */
-var CSS = "\
-@keyframes spin { 0%{transform:rotate(0)} 100%{transform:rotate(360deg)} }\
-@keyframes sweep { 0%{transform:translateX(-120%)} 60%{transform:translateX(20%)} 100%{transform:translateX(120%)} }\
-@keyframes neonPulse { 0%,100%{box-shadow:0 0 16px rgba(34,211,238,.20)} 50%{box-shadow:0 0 26px rgba(34,211,238,.36)} }\
-@keyframes cornerPulse { 0%,100%{filter:drop-shadow(0 0 7px #22d3ee)} 50%{filter:drop-shadow(0 0 12px #22d3ee)} }\
-@keyframes fadeUp { 0%{opacity:0; transform:translateY(8px)} 100%{opacity:1; transform:translateY(0)} }\
-@keyframes panelPop { 0%{opacity:.0; transform:scale(.985)} 100%{opacity:1; transform:scale(1)} }\
-@keyframes slideInLeft { 0%{opacity:.0; transform:translateX(-10px)} 100%{opacity:1; transform:translateX(0)} }\
-@keyframes slideInRight { 0%{opacity:.0; transform:translateX(10px)} 100%{opacity:1; transform:translateX(0)} }\
-";
-
-export default App;
+   
