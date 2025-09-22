@@ -25,7 +25,7 @@ function App() {
   useEffect(function initChat() {
     setChatHistory([{
       role: 'bot',
-      text: 'Aurora DermaScan ready. Load a sample or ask a skin‑health question.'
+      text: 'Arogya Mantra is ready. Load a skin image or ask a health question.'
     }]);
   }, []);
 
@@ -46,7 +46,7 @@ function App() {
     reader.readAsDataURL(file);
   }
 
-  // Camera
+  // Camera controls
   function startCamera(facingMode) {
     if (!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia)) {
       setError('Device camera not supported.');
@@ -68,7 +68,6 @@ function App() {
       setIsCameraActive(false);
     });
   }
-
   function stopCamera() {
     var stream = videoRef.current && videoRef.current.srcObject;
     if (stream) {
@@ -77,13 +76,11 @@ function App() {
     }
     setIsCameraActive(false);
   }
-
   function switchCamera() {
     var next = currentCamera === 'environment' ? 'user' : 'environment';
     stopCamera();
     startCamera(next);
   }
-
   function capturePhoto() {
     if (!videoRef.current || !canvasRef.current) return;
     var ctx = canvasRef.current.getContext('2d');
@@ -117,11 +114,8 @@ function App() {
       );
       var json = await res.json();
       var text = json && json.candidates && json.candidates[0] && json.candidates[0].content && json.candidates[0].content.parts && json.candidates[0].content.parts[0] && json.candidates[0].content.parts[0].text;
-      if (text) {
-        setResult({ analysis: text, timestamp: new Date().toLocaleString() });
-      } else {
-        setError('No response from AI core.');
-      }
+      if (text) setResult({ analysis: text, timestamp: new Date().toLocaleString() });
+      else setError('No response from AI core.');
     } catch (e) {
       setError('Analysis failed. Network or API issue.');
     } finally { setLoading(false); }
@@ -138,7 +132,7 @@ function App() {
       var payload = {
         contents: [{
           role: "user",
-          parts: [{ text: 'You are Aurora DermaScan assistant. Answer clearly and simply: "' + q + '". Add one short safety note if appropriate.' }]
+          parts: [{ text: 'You are Arogya Mantra assistant. Answer simply and clearly: "' + q + '". Add one short safety note if needed.' }]
         }]
       };
       var res = await fetch(
@@ -160,7 +154,7 @@ function App() {
       <Overlay />
       <header style={{ paddingTop: 28, textAlign:'center' }}>
         <h1 style={title}>
-          Aurora <span style={{color:'#22d3ee', textShadow:'0 0 14px #22d3ee'}}>DermaScan</span>
+          Arogya <span style={{color:'#22d3ee', textShadow:'0 0 14px #22d3ee'}}>Mantra</span>
         </h1>
         <div style={subtitle}>AI Skin Health Interface</div>
         <div style={divider} />
@@ -193,27 +187,26 @@ function App() {
             <div style={{ display:'grid', gridTemplateColumns:isMobile?'1fr 1fr':'1fr 1fr 1fr', gap:12, marginTop:14 }}>
               {!isCameraActive ? (
                 <React.Fragment>
-                  <Btn icon="📁" text="Load" color="#22d3ee" onClick={function(){ if (fileRef.current) fileRef.current.click(); }} />
-                  <Btn icon="🎥" text="Camera" color="#14b8a6" onClick={function(){ startCamera('environment'); }} />
+                  <Btn icon="📁" text="Load" color="#38bdf8" onClick={function(){ if (fileRef.current) fileRef.current.click(); }} />
+                  <Btn icon="🎥" text="Camera" color="#22d3ee" onClick={function(){ startCamera('environment'); }} />
                   {!isMobile && (
-                    <Btn icon="🧠" text={loading?'Scanning…':'Analyze'} color="#0ea5e9" onClick={analyzeImage} disabled={!image||loading} />
+                    <Btn icon="🧠" text={loading?'Scanning…':'Analyze'} color="#06b6d4" onClick={analyzeImage} disabled={!image||loading} />
                   )}
                 </React.Fragment>
               ) : (
                 <React.Fragment>
                   <Btn icon="📸" text="Capture" color="#ef4444" onClick={capturePhoto} />
-                  <Btn icon="🔄" text="Flip" color="#06b6d4" onClick={switchCamera} />
-                  <Btn icon="⛔" text="Close" color="#475569" onClick={stopCamera} />
+                  <Btn icon="🔄" text="Flip" color="#14b8a6" onClick={switchCamera} />
+                  <Btn icon="⛔" text="Close" color="#64748b" onClick={stopCamera} />
                 </React.Fragment>
               )}
             </div>
 
             {isMobile && !isCameraActive && (
-              <Btn wide icon="🧠" text={loading?'Scanning…':'Analyze with AI'} color="#0ea5e9" onClick={analyzeImage} disabled={!image||loading} style={{marginTop:12}} />
+              <Btn wide icon="🧠" text={loading?'Scanning…':'Analyze with AI'} color="#06b6d4" onClick={analyzeImage} disabled={!image||loading} style={{marginTop:12}} />
             )}
 
             <input ref={fileRef} type="file" accept="image/*" onChange={handleFileSelect} style={{ display:'none' }} />
-
             <InfoStrip />
           </section>
 
@@ -227,7 +220,7 @@ function App() {
           )}
 
           <section style={panel2}>
-            <PanelHeader icon="ℹ️" text="About Aurora DermaScan" />
+            <PanelHeader icon="ℹ️" text="About Arogya Mantra" />
             <ul style={aboutList}>
               <li><strong>Purpose:</strong> A learning and triage aid that offers AI‑generated explanations for common skin presentations from a photo.</li>
               <li><strong>How it helps:</strong> Summarizes likely conditions, confidence, typical features, and simple care tips in seconds.</li>
@@ -246,7 +239,7 @@ function App() {
               {chatHistory.map(function(m,i){
                 return <Bubble key={i} me={m.role==='user'}>{m.text}</Bubble>;
               })}
-              {isChatting && <div style={{opacity:.8,fontSize:13}}>…linking to medical core</div>}
+              {isChatting && <div style={{opacity:.8,fontSize:13}}>…connecting</div>}
             </div>
             <div style={{ display:'flex', gap:10, marginTop:12 }}>
               <input
@@ -256,7 +249,7 @@ function App() {
                 placeholder="Ask about skin care, symptoms, treatments…"
                 style={chatInput}
               />
-              <Btn icon="🚀" text="Send" color="#22d3ee" onClick={sendMessage} disabled={isChatting || !userMessage.trim()} />
+              <Btn icon="🚀" text="Send" color="#38bdf8" onClick={sendMessage} disabled={isChatting || !userMessage.trim()} />
             </div>
           </section>
         </div>
@@ -267,24 +260,30 @@ function App() {
   );
 }
 
-/* ——— Theme + styles ——— */
-
+/* ——— Black theme ——— */
 var rootBg = {
   minHeight:'100vh',
-  backgroundColor:'#071317',
-  color:'#e6fffb',
+  backgroundColor:'#050607',
+  color:'#f0fbff',
   overflowX:'hidden',
   background:
-   'radial-gradient(circle at 20% 20%, rgba(14,165,233,0.18) 0, transparent 55%),' +
-   'radial-gradient(circle at 80% 30%, rgba(13,148,136,0.18) 0, transparent 50%),' +
-   'linear-gradient(transparent 98%, rgba(148,163,184,0.12) 98%),' +
-   'linear-gradient(90deg, transparent 98%, rgba(148,163,184,0.12) 98%)',
-  backgroundSize:'900px 900px, 900px 900px, 36px 36px, 36px 36px'
+   'radial-gradient(circle at 18% 22%, rgba(34,211,238,0.14) 0, transparent 55%),' +
+   'radial-gradient(circle at 82% 30%, rgba(56,189,248,0.12) 0, transparent 50%),' +
+   'linear-gradient(transparent 98%, rgba(148,163,184,0.10) 98%),' +
+   'linear-gradient(90deg, transparent 98%, rgba(148,163,184,0.10) 98%)',
+  backgroundSize:'1000px 1000px, 1000px 1000px, 36px 36px, 36px 36px'
 };
 var centerWrap = { maxWidth:880, margin:'0 auto', padding:'0 14px 60px' };
-var title = { fontSize:52, fontWeight:900, letterSpacing:.3, color:'#a7f3d0', textShadow:'0 0 14px #0ea5e9', margin:0 };
-var subtitle = { marginTop:6, fontSize:14, opacity:.9, color:'#bff5ec' };
-var divider = { height:3, width:240, margin:'16px auto 10px', background:'linear-gradient(90deg,#14b8a6,#22d3ee)', filter:'blur(.3px)', borderRadius:2, boxShadow:'0 0 12px #22d3ee' };
+var title = { fontSize:52, fontWeight:900, letterSpacing:.4, color:'#e2faff', textShadow:'0 0 16px #22d3ee', margin:0 };
+var subtitle = { marginTop:6, fontSize:14, opacity:.9, color:'#c7f9ff' };
+var divider = { height:3, width:240, margin:'16px auto 10px', background:'linear-gradient(90deg,#22d3ee,#14b8a6)', filter:'blur(.35px)', borderRadius:2, boxShadow:'0 0 14px #22d3ee' };
+
+var tabsWrap = {
+  padding:6, display:'flex', gap:6,
+  background:'linear-gradient(135deg, rgba(8,10,12,0.8), rgba(12,14,16,0.8))',
+  border:'1px solid rgba(56,189,248,0.35)',
+  borderRadius:16, boxShadow:'0 0 18px rgba(34,211,238,.18)'
+};
 
 function Overlay(){
   return (
@@ -292,11 +291,11 @@ function Overlay(){
       <div style={{
         pointerEvents:'none', position:'fixed', inset:0,
         background:'repeating-linear-gradient(0deg, rgba(255,255,255,0.02) 0, rgba(255,255,255,0.02) 2px, transparent 2px, transparent 4px)',
-        mixBlendMode:'overlay', opacity:.22
+        mixBlendMode:'overlay', opacity:.20
       }} />
       <div style={{
         pointerEvents:'none', position:'fixed', inset:0,
-        background:'radial-gradient(ellipse at center, transparent 60%, rgba(0,0,0,0.55) 100%)'
+        background:'radial-gradient(ellipse at center, transparent 60%, rgba(0,0,0,0.62) 100%)'
       }} />
     </div>
   );
@@ -306,10 +305,10 @@ function Tab(props){
   return (
     <button onClick={props.onClick} style={{
       padding:'10px 18px', borderRadius:12,
-      border:'1px solid rgba(34,211,238,0.35)',
-      background: props.active ? 'linear-gradient(135deg, rgba(13,148,136,0.3), rgba(34,211,238,0.3))' : 'transparent',
-      color:'#e6fffb', cursor:'pointer', transition:'all .25s',
-      boxShadow: props.active ? '0 0 12px rgba(34,211,238,.65)' : 'none'
+      border:'1px solid rgba(56,189,248,0.35)',
+      background: props.active ? 'linear-gradient(135deg, rgba(56,189,248,0.28), rgba(34,211,238,0.28))' : 'transparent',
+      color:'#e6faff', cursor:'pointer', transition:'all .25s',
+      boxShadow: props.active ? '0 0 14px rgba(34,211,238,.6)' : 'none'
     }}>
       {props.children}
     </button>
@@ -317,25 +316,25 @@ function Tab(props){
 }
 
 var panel = {
-  background:'linear-gradient(135deg, rgba(4,11,14,0.65), rgba(8,11,14,0.65))',
-  border:'1px solid rgba(34,211,238,0.35)',
-  borderRadius:16, position:'relative', boxShadow:'0 0 14px rgba(14,165,233,.15)',
+  background:'linear-gradient(135deg, rgba(9,11,13,0.9), rgba(13,16,19,0.9))',
+  border:'1px solid rgba(56,189,248,0.28)',
+  borderRadius:16, position:'relative', boxShadow:'0 0 18px rgba(34,211,238,.14)',
   padding:18, animation:'panelPop .45s ease-out both'
 };
 var panel2 = {
-  background:'linear-gradient(135deg, rgba(4,11,14,0.65), rgba(8,11,14,0.65))',
-  border:'1px solid rgba(34,211,238,0.35)',
-  borderRadius:16, position:'relative', boxShadow:'0 0 14px rgba(14,165,233,.15)',
-  padding:18
+  background:'linear-gradient(135deg, rgba(9,11,13,0.9), rgba(13,16,19,0.9))',
+  border:'1px solid rgba(56,189,248,0.28)',
+  borderRadius:16, position:'relative', boxShadow:'0 0 18px rgba(34,211,238,.14)',
+  padding:18, marginTop:16
 };
 
 function PanelHeader(props){
   return (
-    <div style={{display:'flex',alignItems:'center',gap:10, marginBottom:10, fontSize:16, opacity:.95}}>
+    <div style={{display:'flex',alignItems:'center',gap:10, marginBottom:10, fontSize:16, opacity:.98}}>
       <span>{props.icon}</span>
       <span>{props.text}</span>
       <div style={{flex:1}} />
-      <div style={{height:2, width:120, background:'linear-gradient(90deg,#14b8a6,#22d3ee)', boxShadow:'0 0 8px #22d3ee'}} />
+      <div style={{height:2, width:120, background:'linear-gradient(90deg,#22d3ee,#14b8a6)', boxShadow:'0 0 10px #22d3ee'}} />
     </div>
   );
 }
@@ -344,11 +343,11 @@ function PreviewShell(props){
   return (
     <div style={{
       position:'relative',
-      border:'1px dashed rgba(34,211,238,0.35)',
+      border:'1px dashed rgba(56,189,248,0.35)',
       borderRadius:16, minHeight:260,
       display:'flex', alignItems:'center', justifyContent:'center',
-      background:'linear-gradient(135deg, rgba(5,15,18,0.12), rgba(12,18,20,0.38))',
-      boxShadow:'0 0 18px rgba(34,211,238,0.18)',
+      background:'linear-gradient(135deg, rgba(12,14,16,0.35), rgba(16,18,20,0.55))',
+      boxShadow:'0 0 22px rgba(56,189,248,0.20)',
       animation:'neonPulse 2.4s ease-in-out infinite'
     }}>
       {['tl','tr','bl','br'].map(function(_,i){
@@ -361,7 +360,7 @@ function PreviewShell(props){
             borderBottom: i>=2?'2px solid #22d3ee':'none',
             top: i<2?10:'auto', bottom:i>=2?10:'auto',
             left:i%2===0?10:'auto', right:i%2===1?10:'auto',
-            filter:'drop-shadow(0 0 6px #22d3ee)',
+            filter:'drop-shadow(0 0 8px #22d3ee)',
             animation:'cornerPulse 1.8s ease-in-out infinite'
           }} />
         );
@@ -371,7 +370,7 @@ function PreviewShell(props){
       </div>
       <div style={{
         position:'absolute', inset:0,
-        background:'linear-gradient(120deg, transparent 20%, rgba(34,211,238,0.07) 45%, transparent 70%)',
+        background:'linear-gradient(120deg, transparent 20%, rgba(34,211,238,0.09) 45%, transparent 70%)',
         transform:'translateX(-120%)',
         animation:'sweep 3.2s ease-in-out infinite'
       }} />
@@ -379,8 +378,8 @@ function PreviewShell(props){
   );
 }
 
-var videoStyle = { width:'100%', maxHeight:340, borderRadius:12, objectFit:'cover', outline:'1px solid rgba(34,211,238,0.25)' };
-var imageStyle = { maxWidth:'100%', maxHeight:340, borderRadius:12, outline:'1px solid rgba(34,211,238,0.25)' };
+var videoStyle = { width:'100%', maxHeight:340, borderRadius:12, objectFit:'cover', outline:'1px solid rgba(56,189,248,0.28)' };
+var imageStyle = { maxWidth:'100%', maxHeight:340, borderRadius:12, outline:'1px solid rgba(56,189,248,0.28)' };
 
 function EmptyState(){
   return (
@@ -396,13 +395,13 @@ function Btn(props){
     <button onClick={props.onClick} disabled={props.disabled} style={{
       padding: props.wide?'14px 16px':'12px 14px',
       borderRadius:12,
-      border:'1px solid rgba(34,211,238,0.35)',
-      background:'linear-gradient(135deg, ' + rgba(props.color,.30) + ', ' + rgba(shade(props.color),.30) + ')',
-      color:'#e6fffb', cursor:props.disabled?'not-allowed':'pointer',
+      border:'1px solid rgba(56,189,248,0.35)',
+      background:'linear-gradient(135deg, ' + toRGBA(props.color,.34) + ', ' + toRGBA(shade(props.color),.34) + ')',
+      color:'#eafcff', cursor:props.disabled?'not-allowed':'pointer',
       transition:'transform .15s ease, box-shadow .2s ease, filter .2s ease',
       width: props.wide?'100%':'auto',
       filter: props.disabled ? 'grayscale(.2) opacity(.8)' : 'none',
-      boxShadow:'0 0 12px rgba(34,211,238,.18)',
+      boxShadow:'0 0 16px rgba(34,211,238,.20)',
       ...(props.style || {})
     }}>
       <span style={{marginRight:8}}>{props.icon}</span>{props.text}
@@ -415,8 +414,8 @@ function InfoStrip(){
     <div style={{
       marginTop:12, padding:'10px 12px',
       borderRadius:10,
-      background:'linear-gradient(90deg, rgba(13,148,136,0.15), rgba(34,211,238,0.15))',
-      border:'1px solid rgba(13,148,136,0.28)', fontSize:13
+      background:'linear-gradient(90deg, rgba(2,132,199,0.18), rgba(13,148,136,0.18))',
+      border:'1px solid rgba(56,189,248,0.30)', fontSize:13
     }}>
       Tip: Use diffused light; keep the lesion in focus; fill the frame for best inference.
     </div>
@@ -428,17 +427,17 @@ function Analyzing(){
     <div style={{ position:'relative', padding:'28px 14px', textAlign:'center' }}>
       <div style={{
         width:120, height:120, borderRadius:'50%', margin:'0 auto 12px',
-        border:'3px solid rgba(34,211,238,0.25)', position:'relative',
-        boxShadow:'0 0 16px rgba(14,165,233,0.25)'
+        border:'3px solid rgba(56,189,248,0.28)', position:'relative',
+        boxShadow:'0 0 18px rgba(34,211,238,0.28)'
       }}>
         <div style={{
           position:'absolute', inset:8, borderRadius:'50%',
-          background:'conic-gradient(from 0deg, rgba(34,211,238,.45), rgba(14,165,233,.0) 40%)',
+          background:'conic-gradient(from 0deg, rgba(34,211,238,.55), rgba(14,165,233,.0) 40%)',
           filter:'blur(1px)', animation:'spin 1.6s linear infinite'
         }} />
         <div style={{
           position:'absolute', inset:0, borderRadius:'50%',
-          border:'2px dashed rgba(34,211,238,0.35)', animation:'spin 6s linear infinite reverse'
+          border:'2px dashed rgba(56,189,248,0.35)', animation:'spin 6s linear infinite reverse'
         }} />
       </div>
       <div>Analyzing dermal pattern…</div>
@@ -462,17 +461,17 @@ function ResultBox(props){
   return (
     <div style={{ animation:'fadeUp .4s ease-out both' }}>
       <div style={{
-        border:'1px solid rgba(13,148,136,0.35)',
-        background:'linear-gradient(135deg, rgba(2,44,34,0.45), rgba(12,74,61,0.35))',
+        border:'1px solid rgba(14,165,233,0.35)',
+        background:'linear-gradient(135deg, rgba(2,20,30,0.55), rgba(6,37,46,0.45))',
         padding:14, borderRadius:12, marginBottom:12
       }}>
         <pre style={{
           margin:0, whiteSpace:'pre-wrap',
           fontFamily:'ui-monospace, SFMono-Regular, Menlo, monospace',
-          lineHeight:1.6, color:'#d1fae5'
+          lineHeight:1.6, color:'#d1faff'
         }}>{props.result.analysis}</pre>
       </div>
-      <div style={{ fontSize:12, opacity:.85, textAlign:'right' }}>⏱ {props.result.timestamp}</div>
+      <div style={{ fontSize:12, opacity:.9, textAlign:'right' }}>⏱ {props.result.timestamp}</div>
       <div style={{
         marginTop:10, padding:10, fontSize:12, borderRadius:10,
         border:'1px solid rgba(250,204,21,0.35)',
@@ -492,10 +491,10 @@ function Bubble(props){
     }}>
       <div style={{
         maxWidth:'78%', padding:'10px 14px', borderRadius:12,
-        border:'1px solid rgba(34,211,238,0.28)',
+        border:'1px solid rgba(56,189,248,0.30)',
         background: props.me
-          ? 'linear-gradient(135deg, rgba(14,165,233,0.35), rgba(34,211,238,0.35))'
-          : 'linear-gradient(135deg, rgba(4,11,14,0.7), rgba(8,11,14,0.7))',
+          ? 'linear-gradient(135deg, rgba(56,189,248,0.35), rgba(34,211,238,0.35))'
+          : 'linear-gradient(135deg, rgba(12,14,16,0.85), rgba(16,18,20,0.85))',
         fontSize:14, lineHeight:1.5
       }}>
         {props.children}
@@ -505,18 +504,19 @@ function Bubble(props){
 }
 
 var chatBox = {
-  height: 420, overflowY:'auto', border:'1px solid rgba(34,211,238,0.32)',
+  height: 420, overflowY:'auto', border:'1px solid rgba(56,189,248,0.32)',
   borderRadius:14, padding:14,
-  background:'linear-gradient(135deg, rgba(4,11,14,0.55), rgba(8,11,14,0.45))',
-  boxShadow:'0 0 18px rgba(34,211,238,0.18)'
+  background:'linear-gradient(135deg, rgba(12,14,16,0.75), rgba(16,18,20,0.65))',
+  boxShadow:'0 0 22px rgba(34,211,238,0.20)'
 };
 var chatInput = {
   flex:1, padding:'12px 14px', borderRadius:12,
-  border:'1px solid rgba(34,211,238,0.35)',
-  background:'rgba(4,11,14,0.5)', color:'#e6fffb', outline:'none'
+  border:'1px solid rgba(56,189,248,0.35)',
+  background:'rgba(12,14,16,0.6)', color:'#eafcff', outline:'none'
 };
 
-function rgba(hexColor, a){
+/* helpers */
+function toRGBA(hexColor, a){
   if (hexColor.indexOf('rgb')===0) return hexColor;
   var c = hexColor.replace('#','');
   var n = parseInt(c,16);
@@ -533,22 +533,15 @@ function shade(hexColor){
 }
 
 var aboutList = {
-  margin:0, paddingLeft:18, lineHeight:1.65, color:'#d9fbf6', fontSize:14
-};
-
-var tabsWrap = { 
-  padding:6, display:'flex', gap:6,
-  background:'linear-gradient(135deg, rgba(4,11,14,0.65), rgba(8,11,14,0.65))',
-  border:'1px solid rgba(34,211,238,0.35)',
-  borderRadius:16, boxShadow:'0 0 14px rgba(14,165,233,.15)'
+  margin:0, paddingLeft:18, lineHeight:1.65, color:'#d7fbff', fontSize:14
 };
 
 /* Keyframes */
 var CSS = "\
 @keyframes spin { 0%{transform:rotate(0)} 100%{transform:rotate(360deg)} }\
 @keyframes sweep { 0%{transform:translateX(-120%)} 60%{transform:translateX(20%)} 100%{transform:translateX(120%)} }\
-@keyframes neonPulse { 0%,100%{box-shadow:0 0 14px rgba(34,211,238,.18)} 50%{box-shadow:0 0 22px rgba(34,211,238,.32)} }\
-@keyframes cornerPulse { 0%,100%{filter:drop-shadow(0 0 5px #22d3ee)} 50%{filter:drop-shadow(0 0 10px #22d3ee)} }\
+@keyframes neonPulse { 0%,100%{box-shadow:0 0 16px rgba(34,211,238,.20)} 50%{box-shadow:0 0 26px rgba(34,211,238,.36)} }\
+@keyframes cornerPulse { 0%,100%{filter:drop-shadow(0 0 7px #22d3ee)} 50%{filter:drop-shadow(0 0 12px #22d3ee)} }\
 @keyframes fadeUp { 0%{opacity:0; transform:translateY(8px)} 100%{opacity:1; transform:translateY(0)} }\
 @keyframes panelPop { 0%{opacity:.0; transform:scale(.985)} 100%{opacity:1; transform:scale(1)} }\
 @keyframes slideInLeft { 0%{opacity:.0; transform:translateX(-10px)} 100%{opacity:1; transform:translateX(0)} }\
@@ -556,5 +549,3 @@ var CSS = "\
 ";
 
 export default App;
-
-
