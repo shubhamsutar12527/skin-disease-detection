@@ -25,7 +25,7 @@ function App() {
   useEffect(() => {
     setChatHistory([{
       role: 'bot',
-      text: "Arogya OS is online. Center console ready. Load a sample or query the medical core."
+      text: 'Aurora DermaScan ready. Load a sample or ask a skin-health question.'
     }]);
   }, []);
 
@@ -135,7 +135,7 @@ function App() {
       const payload = {
         contents: [{
           role: "user",
-          parts: [{ text: `You are Arogya OS (futuristic medical AI). Answer clearly: "${q}". Add one short safety note if appropriate.` }]
+          parts: [{ text: `You are Aurora DermaScan assistant. Answer clearly and simply: "${q}". Add one short safety note if appropriate.` }]
         }]
       };
       const res = await fetch(
@@ -150,109 +150,109 @@ function App() {
     } finally { setIsChatting(false); }
   };
 
-  // Styles helpers
-  const neon = (c='#60a5fa', s=12) => ({ boxShadow: `0 0 ${s}px ${c}, inset 0 0 ${s}px rgba(0,0,0,0)` });
-
-  const Holo = (extra={}) => ({
-    background: 'linear-gradient(135deg, rgba(9,14,24,0.65), rgba(2,6,23,0.65))',
-    border: '1px solid rgba(56,189,248,0.35)',
-    borderRadius: 16, position: 'relative', ...extra
-  });
-
-  const CenterWrap = { maxWidth: 980, margin: '0 auto', padding: '10px 14px 60px' };
-
+  // UI helpers
   const isMobile = typeof window !== 'undefined' ? window.innerWidth <= 820 : false;
 
   return (
-    <div style={RootBG}>
-      {/* HUD layers */}
+    <div style={rootBg}>
       <Scanlines />
       <Vignette />
-      <GridNodes />
 
       {/* Header */}
-      <header style={{ paddingTop: 28, textAlign: 'center' }}>
-        <h1 style={Title}>Arogya <span style={{color:'#a78bfa',textShadow:'0 0 12px #8b5cf6'}}>OS</span></h1>
-        <div style={Subtitle}>AI Medical Interface • Skin Scanner v2</div>
-        <div style={Divider} />
+      <header style={{ paddingTop: 28, textAlign:'center' }}>
+        <h1 style={title}>
+          Aurora <span style={{color:'#22d3ee', textShadow:'0 0 14px #22d3ee'}}>DermaScan</span>
+        </h1>
+        <div style={subtitle}>AI Skin Health Interface</div>
+        <div style={divider} />
       </header>
 
       {/* Tabs */}
-      <div style={{ display:'flex', justifyContent:'center', margin:'18px 0 24px' }}>
-        <div style={{ ...Holo({ padding:6, display:'flex', gap:6 }), ...neon('rgba(125,211,252,0.35)') }}>
-          <TabButton active={activeTab==='diagnosis'} label="🔬 Scan Module" onClick={()=>setActiveTab('diagnosis')} />
-          <TabButton active={activeTab==='chatbot'} label="🤖 Medical Core" onClick={()=>setActiveTab('chatbot')} />
+      <div style={{ display:'flex', justifyContent:'center', margin:'16px 0 22px' }}>
+        <div style={{ ...holo({ padding:6, display:'flex', gap:6 }), boxShadow:'0 0 14px rgba(34,197,94,.25)' }}>
+          <Tab active={activeTab==='diagnosis'} onClick={()=>setActiveTab('diagnosis')}>🔬 Scan</Tab>
+          <Tab active={activeTab==='chatbot'} onClick={()=>setActiveTab('chatbot')}>🤖 Assistant</Tab>
         </div>
       </div>
 
-      {/* Centered Console + Output stacked */}
+      {/* Centered Console and Output */}
       {activeTab==='diagnosis' && (
-        <main style={CenterWrap}>
+        <main style={centerWrap}>
           {/* Console */}
-          <section style={{ ...Holo({ padding: 18 }), animation:'panelPop .45s ease-out both', ...neon('rgba(125,211,252,0.25)') }}>
-            <PanelHeader icon="🛰" text="Central Input Console" />
-            <PreviewBox isCameraActive={isCameraActive} image={image}>
+          <section style={{ ...holo({ padding:18 }), animation:'panelPop .45s ease-out both' }}>
+            <PanelHeader icon="📡" text="Central Input Console" />
+            <PreviewShell>
               {isCameraActive ? (
                 <>
-                  <video ref={videoRef} autoPlay playsInline muted style={VideoStyle} />
+                  <video ref={videoRef} autoPlay playsInline muted style={videoStyle} />
                   <canvas ref={canvasRef} style={{ display:'none' }} />
                 </>
               ) : image ? (
-                <img src={image} alt="preview" style={ImageStyle} />
+                <img src={image} alt="preview" style={imageStyle} />
               ) : (
                 <EmptyState />
               )}
-            </PreviewBox>
+            </PreviewShell>
 
             {/* Controls */}
             <div style={{ display:'grid', gridTemplateColumns:isMobile?'1fr 1fr':'1fr 1fr 1fr', gap:12, marginTop:14 }}>
               {!isCameraActive ? (
                 <>
-                  <Button icon="📁" text="Load" color="#22d3ee" onClick={()=>fileRef.current?.click()} />
-                  <Button icon="🎥" text="Camera" color="#8b5cf6" onClick={()=>startCamera('environment')} />
+                  <Btn icon="📁" text="Load" color="#22d3ee" onClick={()=>fileRef.current?.click()} />
+                  <Btn icon="🎥" text="Camera" color="#14b8a6" onClick={()=>startCamera('environment')} />
                   {!isMobile && (
-                    <Button icon="🧠" text={loading?'Scanning…':'Analyze'} color="#10b981" onClick={analyzeImage} disabled={!image||loading} />
+                    <Btn icon="🧠" text={loading?'Scanning…':'Analyze'} color="#0ea5e9" onClick={analyzeImage} disabled={!image||loading} />
                   )}
                 </>
               ) : (
                 <>
-                  <Button icon="📸" text="Capture" color="#ef4444" onClick={capturePhoto} />
-                  <Button icon="🔄" text="Flip" color="#a78bfa" onClick={switchCamera} />
-                  <Button icon="⛔" text="Close" color="#94a3b8" onClick={stopCamera} />
+                  <Btn icon="📸" text="Capture" color="#ef4444" onClick={capturePhoto} />
+                  <Btn icon="🔄" text="Flip" color="#06b6d4" onClick={switchCamera} />
+                  <Btn icon="⛔" text="Close" color="#475569" onClick={stopCamera} />
                 </>
               )}
             </div>
 
-            {/* Mobile Analyze */}
-            {!isCameraActive && isMobile && (
-              <Button wide icon="🧠" text={loading?'Scanning…':'Analyze with AI'} color="#10b981" onClick={analyzeImage} disabled={!image||loading} style={{marginTop:12}} />
+            {isMobile && !isCameraActive && (
+              <Btn wide icon="🧠" text={loading?'Scanning…':'Analyze with AI'} color="#0ea5e9" onClick={analyzeImage} disabled={!image||loading} style={{marginTop:12}} />
             )}
 
             <input ref={fileRef} type="file" accept="image/*" onChange={handleFileSelect} style={{ display:'none' }} />
 
-            <TipRibbon />
+            <InfoStrip />
           </section>
 
-          {/* Output below console */}
+          {/* Output below */}
           {(result || error || loading) && (
-            <section style={{ ...Holo({ padding: 18, marginTop: 16 }), animation:'fadeUp .45s .1s ease-out both', ...neon('rgba(168,85,247,0.22)') }}>
+            <section style={{ ...holo({ padding:18, marginTop:16 }), animation:'fadeUp .45s .05s ease-out both' }}>
               <PanelHeader icon="📊" text="Diagnostic Output" />
-              {loading && <AnalyzingBlock />}
-              {error && <ErrorBlock text={error} />}
-              {result && <ResultBlock result={result} />}
+              {loading && <Analyzing />}
+              {error && <ErrorBox text={error} />}
+              {result && <ResultBox result={result} />}
             </section>
           )}
+
+          {/* General Information */}
+          <section style={{ ...holo({ padding:18, marginTop:16 }), animation:'fadeUp .45s .1s ease-out both' }}>
+            <PanelHeader icon="ℹ️" text="About Aurora DermaScan" />
+            <ul style={aboutList}>
+              <li><strong>Purpose:</strong> A learning and triage aid that offers AI‑generated explanations for common skin presentations from a photo.</li>
+              <li><strong>How it helps:</strong> Summarizes likely conditions, confidence, typical features, and simple care tips in seconds.</li>
+              <li><strong>Important:</strong> This is not a diagnosis. For persistent, painful, spreading, or worrisome lesions, consult a licensed clinician.</li>
+              <li><strong>Privacy:</strong> Images are analyzed temporarily to generate a response and are not stored by the app.</li>
+            </ul>
+          </section>
         </main>
       )}
 
-      {/* Chatbot */}
+      {/* Assistant */}
       {activeTab==='chatbot' && (
-        <div style={CenterWrap}>
-          <section style={{ ...Holo({ padding: 18 }), animation:'panelPop .45s ease-out both' }}>
-            <PanelHeader icon="🧬" text="Medical Core Chat" />
-            <div ref={chatRef} style={ChatBox}>
+        <div style={centerWrap}>
+          <section style={{ ...holo({ padding:18 }), animation:'panelPop .45s ease-out both' }}>
+            <PanelHeader icon="🧬" text="Skin Health Assistant" />
+            <div ref={chatRef} style={chatBox}>
               {chatHistory.map((m,i)=>(
-                <ChatBubble key={i} role={m.role} text={m.text} />
+                <Bubble key={i} me={m.role==='user'}>{m.text}</Bubble>
               ))}
               {isChatting && <div style={{opacity:.8,fontSize:13}}>…linking to medical core</div>}
             </div>
@@ -261,77 +261,81 @@ function App() {
                 type="text" value={userMessage}
                 onChange={(e)=>setUserMessage(e.target.value)}
                 onKeyDown={(e)=> e.key==='Enter' && sendMessage()}
-                placeholder="Query the medical core…"
-                style={ChatInput}
+                placeholder="Ask about skin care, symptoms, treatments…"
+                style={chatInput}
               />
-              <Button icon="🚀" text="Send" color="#60a5fa" onClick={sendMessage} disabled={isChatting || !userMessage.trim()} />
+              <Btn icon="🚀" text="Send" color="#22d3ee" onClick={sendMessage} disabled={isChatting || !userMessage.trim()} />
             </div>
           </section>
         </div>
       )}
 
-      {/* Keyframes + Decorations */}
-      <style dangerouslySetInnerHTML={{__html: CSS_ANIMS }} />
+      <style dangerouslySetInnerHTML={{__html: CSS}} />
     </div>
   );
 }
 
-/* ————— Components ————— */
-
-const RootBG = {
-  minHeight: '100vh',
-  backgroundColor: '#030712',
-  color: '#e6f7ff',
-  overflowX: 'hidden',
+/* ——— Theming ——— */
+const rootBg = {
+  minHeight:'100vh',
+  backgroundColor:'#071317',
+  color:'#e6fffb',
+  overflowX:'hidden',
   background:
-    `radial-gradient(circle at 15% 20%, rgba(59,130,246,0.18) 0, transparent 55%),
-     radial-gradient(circle at 80% 30%, rgba(20,184,166,0.18) 0, transparent 50%),
-     linear-gradient(transparent 98%, rgba(148,163,184,0.14) 98%),
-     linear-gradient(90deg, transparent 98%, rgba(148,163,184,0.14) 98%)`,
-  backgroundSize: '900px 900px, 900px 900px, 36px 36px, 36px 36px'
+   `radial-gradient(circle at 20% 20%, rgba(14,165,233,0.18) 0, transparent 55%),
+    radial-gradient(circle at 80% 30%, rgba(13,148,136,0.18) 0, transparent 50%),
+    linear-gradient(transparent 98%, rgba(148,163,184,0.12) 98%),
+    linear-gradient(90deg, transparent 98%, rgba(148,163,184,0.12) 98%)`,
+  backgroundSize:'900px 900px, 900px 900px, 36px 36px, 36px 36px'
 };
+const centerWrap = { maxWidth:880, margin:'0 auto', padding:'0 14px 60px' };
+const title = { fontSize:52, fontWeight:900, letterSpacing:.3, color:'#a7f3d0', textShadow:'0 0 14px #0ea5e9', margin:0 };
+const subtitle = { marginTop:6, fontSize:14, opacity:.9, color:'#bff5ec' };
+const divider = { height:3, width:240, margin:'16px auto 10px', background:'linear-gradient(90deg,#14b8a6,#22d3ee)', filter:'blur(.3px)', borderRadius:2, boxShadow:'0 0 12px #22d3ee' };
 
-const Title = { fontSize: 54, fontWeight: 900, letterSpacing: .5, textShadow:'0 0 14px #38bdf8', margin:0 };
-const Subtitle = { marginTop: 6, fontSize: 14, opacity:.85 };
-const Divider = { height:3, width:240, margin:'16px auto 10px', background:'linear-gradient(90deg,#22d3ee,#8b5cf6)', filter:'blur(.4px)', borderRadius:2, boxShadow:'0 0 12px #22d3ee' };
+const holo = (extra) => ({
+  background:'linear-gradient(135deg, rgba(4,11,14,0.65), rgba(8,11,14,0.65))',
+  border:'1px solid rgba(34,211,238,0.35)',
+  borderRadius:16, position:'relative', boxShadow:'0 0 14px rgba(14,165,233,.15)', ...extra
+});
 
-function TabButton({active,label,onClick}) {
+/* ——— Reusable UI ——— */
+function Tab({active, children, onClick}) {
   return (
     <button onClick={onClick} style={{
       padding:'10px 18px', borderRadius:12,
-      border:'1px solid rgba(56,189,248,0.35)',
-      background: active? 'linear-gradient(135deg, rgba(34,211,238,0.25), rgba(139,92,246,0.25))' : 'transparent',
-      color:'#c7d2fe', cursor:'pointer', transition:'all .25s',
-      boxShadow: active ? '0 0 12px rgba(96,165,250,.8)' : 'none'
+      border:'1px solid rgba(34,211,238,0.35)',
+      background: active ? 'linear-gradient(135deg, rgba(13,148,136,0.3), rgba(34,211,238,0.3))' : 'transparent',
+      color:'#e6fffb', cursor:'pointer', transition:'all .25s',
+      boxShadow: active ? '0 0 12px rgba(34,211,238,.65)' : 'none'
     }}>
-      {label}
+      {children}
     </button>
   );
 }
 
 function PanelHeader({icon, text}) {
   return (
-    <div style={{display:'flex',alignItems:'center',gap:10, marginBottom:10, fontSize:16, opacity:.9}}>
+    <div style={{display:'flex',alignItems:'center',gap:10, marginBottom:10, fontSize:16, opacity:.95}}>
       <span>{icon}</span>
       <span>{text}</span>
       <div style={{flex:1}} />
-      <div style={{height:2, width:120, background:'linear-gradient(90deg,#22d3ee,#8b5cf6)', boxShadow:'0 0 8px #22d3ee'}} />
+      <div style={{height:2, width:120, background:'linear-gradient(90deg,#14b8a6,#22d3ee)', boxShadow:'0 0 8px #22d3ee'}} />
     </div>
   );
 }
 
-function PreviewBox({children, isCameraActive, image}) {
+function PreviewShell({children}) {
   return (
     <div style={{
       position:'relative',
-      border:'1px dashed rgba(125,211,252,0.35)',
+      border:'1px dashed rgba(34,211,238,0.35)',
       borderRadius:16, minHeight:260,
       display:'flex', alignItems:'center', justifyContent:'center',
-      background:'linear-gradient(135deg, rgba(2,6,23,0.12), rgba(15,23,42,0.38))',
-      boxShadow:'0 0 18px rgba(125,211,252,0.18)',
+      background:'linear-gradient(135deg, rgba(5,15,18,0.12), rgba(12,18,20,0.38))',
+      boxShadow:'0 0 18px rgba(34,211,238,0.18)',
       animation:'neonPulse 2.4s ease-in-out infinite'
     }}>
-      {/* Reticle corners */}
       {['tl','tr','bl','br'].map((k,i)=>(
         <div key={i} style={{
           position:'absolute', width:30, height:30,
@@ -345,47 +349,41 @@ function PreviewBox({children, isCameraActive, image}) {
           animation:'cornerPulse 1.8s ease-in-out infinite'
         }} />
       ))}
-
-      {/* Holo sweep */}
-      <div style={{
-        position:'absolute', inset:0,
-        background: 'linear-gradient(120deg, transparent 20%, rgba(34,211,238,0.06) 40%, transparent 60%)',
-        transform:'translateX(-100%)',
-        animation:'sweep 3.2s ease-in-out infinite'
-      }} />
-
-      {/* Content */}
       <div style={{position:'relative', zIndex:1, width:'100%'}}>
         {children}
       </div>
+      <div style={{
+        position:'absolute', inset:0,
+        background: 'linear-gradient(120deg, transparent 20%, rgba(34,211,238,0.07) 45%, transparent 70%)',
+        transform:'translateX(-120%)',
+        animation:'sweep 3.2s ease-in-out infinite'
+      }} />
     </div>
   );
 }
 
-const VideoStyle = { width:'100%', maxHeight:340, borderRadius:12, objectFit:'cover', outline:'1px solid rgba(125,211,252,0.25)' };
-const ImageStyle = { maxWidth:'100%', maxHeight:340, borderRadius:12, outline:'1px solid rgba(125,211,252,0.25)' };
+const videoStyle = { width:'100%', maxHeight:340, borderRadius:12, objectFit:'cover', outline:'1px solid rgba(34,211,238,0.25)' };
+const imageStyle = { maxWidth:'100%', maxHeight:340, borderRadius:12, outline:'1px solid rgba(34,211,238,0.25)' };
 
-function EmptyState() {
-  return (
-    <div style={{ textAlign:'center', opacity:.9, padding:'28px 0'}}>
-      <div style={{ fontSize:46, marginBottom:8 }}>📷</div>
-      <div>Load image or activate camera</div>
-    </div>
-  );
-}
+function EmptyState(){ return (
+  <div style={{ textAlign:'center', opacity:.9, padding:'28px 0'}}>
+    <div style={{ fontSize:46, marginBottom:8 }}>📷</div>
+    <div>Load image or activate camera</div>
+  </div>
+);}
 
-function Button({icon, text, color, onClick, disabled, wide, style}) {
+function Btn({icon, text, color, onClick, disabled, wide, style}) {
   return (
     <button onClick={onClick} disabled={disabled} style={{
       padding: wide?'14px 16px':'12px 14px',
       borderRadius:12,
-      border:'1px solid rgba(56,189,248,0.35)',
-      background:`linear-gradient(135deg, ${hex(color,.28)}, ${hex(shade(color),.28)})`,
-      color:'#e6f7ff', cursor:disabled?'not-allowed':'pointer',
+      border:'1px solid rgba(34,211,238,0.35)',
+      background:`linear-gradient(135deg, ${rgba(color,.30)}, ${rgba(shade(color),.30)})`,
+      color:'#e6fffb', cursor:disabled?'not-allowed':'pointer',
       transition:'transform .15s ease, box-shadow .2s ease, filter .2s ease',
       width: wide?'100%':'auto',
       filter: disabled ? 'grayscale(.2) opacity(.8)' : 'none',
-      boxShadow:'0 0 12px rgba(125,211,252,.18)',
+      boxShadow:'0 0 12px rgba(34,211,238,.18)',
       ...style
     }}>
       <span style={{marginRight:8}}>{icon}</span>{text}
@@ -393,149 +391,118 @@ function Button({icon, text, color, onClick, disabled, wide, style}) {
   );
 }
 
-function TipRibbon() {
-  return (
+function InfoStrip(){ return (
+  <div style={{
+    marginTop:12, padding:'10px 12px',
+    borderRadius:10,
+    background:'linear-gradient(90deg, rgba(13,148,136,0.15), rgba(34,211,238,0.15))',
+    border:'1px solid rgba(13,148,136,0.28)', fontSize:13
+  }}>
+    Tip: Use diffused light; keep the lesion in focus; fill the frame for best inference.
+  </div>
+);}
+
+function Analyzing(){ return (
+  <div style={{ position:'relative', padding:'28px 14px', textAlign:'center' }}>
     <div style={{
-      marginTop:12, padding:'10px 12px',
-      borderRadius:10,
-      background:'linear-gradient(90deg, rgba(34,197,94,0.12), rgba(59,130,246,0.12))',
-      border:'1px solid rgba(34,197,94,0.25)', fontSize:13
+      width:120, height:120, borderRadius:'50%', margin:'0 auto 12px',
+      border:'3px solid rgba(34,211,238,0.25)', position:'relative',
+      boxShadow:'0 0 16px rgba(14,165,233,0.25)'
     }}>
-      Tip: Use diffused light; keep the lesion in focus; fill the frame for best inference.
-    </div>
-  );
-}
-
-function AnalyzingBlock() {
-  return (
-    <div style={{ position:'relative', padding:'28px 14px', textAlign:'center' }}>
       <div style={{
-        width:120, height:120, borderRadius:'50%', margin:'0 auto 12px',
-        border:'3px solid rgba(125,211,252,0.25)', position:'relative',
-        boxShadow:'0 0 16px rgba(96,165,250,0.25)'
-      }}>
-        <div style={{
-          position:'absolute', inset:8, borderRadius:'50%',
-          background:'conic-gradient(from 0deg, rgba(34,211,238,.45), rgba(139,92,246,.0) 40%)',
-          filter:'blur(1px)', animation:'spin 1.6s linear infinite'
-        }} />
-        <div style={{
-          position:'absolute', inset:0, borderRadius:'50%',
-          border:'2px dashed rgba(125,211,252,0.35)', animation:'spin 6s linear infinite reverse'
-        }} />
-      </div>
-      <div>Analyzing dermal pattern…</div>
+        position:'absolute', inset:8, borderRadius:'50%',
+        background:'conic-gradient(from 0deg, rgba(34,211,238,.45), rgba(14,165,233,.0) 40%)',
+        filter:'blur(1px)', animation:'spin 1.6s linear infinite'
+      }} />
+      <div style={{
+        position:'absolute', inset:0, borderRadius:'50%',
+        border:'2px dashed rgba(34,211,238,0.35)', animation:'spin 6s linear infinite reverse'
+      }} />
     </div>
-  );
-}
+    <div>Analyzing dermal pattern…</div>
+  </div>
+);}
 
-function ErrorBlock({text}) {
-  return (
+function ErrorBox({text}){ return (
+  <div style={{
+    border:'1px solid rgba(248,113,113,0.35)',
+    background:'linear-gradient(135deg, rgba(127,29,29,0.35), rgba(69,10,10,0.35))',
+    padding:14, borderRadius:12
+  }}>
+    ❌ {text}
+  </div>
+);}
+
+function ResultBox({result}){ return (
+  <div style={{ animation:'fadeUp .4s ease-out both' }}>
     <div style={{
-      border:'1px solid rgba(248,113,113,0.35)',
-      background:'linear-gradient(135deg, rgba(127,29,29,0.35), rgba(69,10,10,0.35))',
-      padding:14, borderRadius:12
+      border:'1px solid rgba(13,148,136,0.35)',
+      background:'linear-gradient(135deg, rgba(2,44,34,0.45), rgba(12,74,61,0.35))',
+      padding:14, borderRadius:12, marginBottom:12
     }}>
-      ❌ {text}
+      <pre style={{
+        margin:0, whiteSpace:'pre-wrap',
+        fontFamily:'ui-monospace, SFMono-Regular, Menlo, monospace',
+        lineHeight:1.6, color:'#d1fae5'
+      }}>{result.analysis}</pre>
     </div>
-  );
-}
-
-function ResultBlock({result}) {
-  return (
-    <div style={{ animation:'fadeUp .4s ease-out both' }}>
-      <div style={{
-        border:'1px solid rgba(34,197,94,0.35)',
-        background:'linear-gradient(135deg, rgba(6,78,59,0.35), rgba(21,128,61,0.25))',
-        padding:14, borderRadius:12, marginBottom:12
-      }}>
-        <pre style={{
-          margin:0, whiteSpace:'pre-wrap',
-          fontFamily:'ui-monospace, SFMono-Regular, Menlo, monospace',
-          lineHeight:1.6, color:'#d1fae5'
-        }}>{result.analysis}</pre>
-      </div>
-      <div style={{ fontSize:12, opacity:.8, textAlign:'right' }}>⏱ {result.timestamp}</div>
-      <div style={{
-        marginTop:10, padding:10, fontSize:12, borderRadius:10,
-        border:'1px solid rgba(250,204,21,0.35)',
-        background:'linear-gradient(135deg, rgba(113,63,18,0.35), rgba(180,83,9,0.25))'
-      }}>
-        ⚠️ Educational tool only. For diagnosis/treatment, consult a licensed clinician.
-      </div>
+    <div style={{ fontSize:12, opacity:.85, textAlign:'right' }}>⏱ {result.timestamp}</div>
+    <div style={{
+      marginTop:10, padding:10, fontSize:12, borderRadius:10,
+      border:'1px solid rgba(250,204,21,0.35)',
+      background:'linear-gradient(135deg, rgba(113,63,18,0.35), rgba(180,83,9,0.25))'
+    }}>
+      ⚠️ Educational tool only. For diagnosis/treatment, consult a licensed clinician.
     </div>
-  );
-}
+  </div>
+);}
 
-function ChatBubble({role, text}) {
-  const isUser = role==='user';
+function Bubble({me, children}) {
   return (
     <div style={{
-      display:'flex', justifyContent: isUser?'flex-end':'flex-start',
-      marginBottom:10, animation: isUser?'slideInRight .35s ease-out both':'slideInLeft .35s ease-out both'
+      display:'flex', justifyContent: me?'flex-end':'flex-start',
+      marginBottom:10, animation: me?'slideInRight .35s ease-out both':'slideInLeft .35s ease-out both'
     }}>
       <div style={{
         maxWidth:'78%', padding:'10px 14px', borderRadius:12,
-        border:'1px solid rgba(56,189,248,0.25)',
-        background: isUser
-          ? 'linear-gradient(135deg, rgba(59,130,246,0.35), rgba(139,92,246,0.35))'
-          : 'linear-gradient(135deg, rgba(2,6,23,0.65), rgba(15,23,42,0.65))',
+        border:'1px solid rgba(34,211,238,0.28)',
+        background: me
+          ? 'linear-gradient(135deg, rgba(14,165,233,0.35), rgba(34,211,238,0.35))'
+          : 'linear-gradient(135deg, rgba(4,11,14,0.7), rgba(8,11,14,0.7))',
         fontSize:14, lineHeight:1.5
       }}>
-        {text}
+        {children}
       </div>
     </div>
   );
 }
 
 /* HUD layers */
-function Scanlines(){
-  return <div style={{
-    pointerEvents:'none', position:'fixed', inset:0,
-    background:'repeating-linear-gradient(0deg, rgba(255,255,255,0.02) 0, rgba(255,255,255,0.02) 2px, transparent 2px, transparent 4px)',
-    mixBlendMode:'overlay', opacity:.35
-  }} />;
-}
-function Vignette(){
-  return <div style={{ pointerEvents:'none', position:'fixed', inset:0,
-    background:'radial-gradient(ellipse at center, transparent 60%, rgba(0,0,0,0.6) 100%)' }} />;
-}
-function GridNodes(){
-  // subtle animated nodes
-  return (
-    <div style={{pointerEvents:'none', position:'fixed', inset:0, overflow:'hidden'}}>
-      {[...Array(18)].map((_,i)=>(
-        <div key={i} style={{
-          position:'absolute',
-          top: `${Math.random()*100}%`,
-          left:`${Math.random()*100}%`,
-          width:6, height:6, borderRadius:'50%',
-          background:'radial-gradient(circle, #22d3ee 20%, transparent 70%)',
-          boxShadow:'0 0 10px #22d3ee',
-          animation:'floatY 6s ease-in-out infinite',
-          animationDelay:`${Math.random()*2}s`,
-          opacity:.5
-        }} />
-      ))}
-    </div>
-  );
-}
+function Scanlines(){ return <div style={{
+  pointerEvents:'none', position:'fixed', inset:0,
+  background:'repeating-linear-gradient(0deg, rgba(255,255,255,0.02) 0, rgba(255,255,255,0.02) 2px, transparent 2px, transparent 4px)',
+  mixBlendMode:'overlay', opacity:.28
+}} />; }
+function Vignette(){ return <div style={{
+  pointerEvents:'none', position:'fixed', inset:0,
+  background:'radial-gradient(ellipse at center, transparent 60%, rgba(0,0,0,0.55) 100%)'
+}} />; }
 
-/* Styles */
-const ChatBox = {
-  height: 420, overflowY:'auto', border:'1px solid rgba(56,189,248,0.3)',
+/* Chat styles */
+const chatBox = {
+  height: 420, overflowY:'auto', border:'1px solid rgba(34,211,238,0.32)',
   borderRadius:14, padding:14,
-  background:'linear-gradient(135deg, rgba(2,6,23,0.55), rgba(15,23,42,0.45))',
-  boxShadow:'0 0 18px rgba(125,211,252,0.18)'
+  background:'linear-gradient(135deg, rgba(4,11,14,0.55), rgba(8,11,14,0.45))',
+  boxShadow:'0 0 18px rgba(34,211,238,0.18)'
 };
-const ChatInput = {
+const chatInput = {
   flex:1, padding:'12px 14px', borderRadius:12,
-  border:'1px solid rgba(56,189,248,0.35)',
-  background:'rgba(2,6,23,0.5)', color:'#e6f7ff', outline:'none'
+  border:'1px solid rgba(34,211,238,0.35)',
+  background:'rgba(4,11,14,0.5)', color:'#e6fffb', outline:'none'
 };
 
-/* Utilities */
-function hex(hexColor, a=1){
+/* Utils */
+function rgba(hexColor, a=1){
   if (hexColor.startsWith('rgb')) return hexColor;
   const c = hexColor.replace('#','');
   const n = parseInt(c,16);
@@ -551,16 +518,16 @@ function shade(hexColor){
 }
 
 /* Keyframes */
-const CSS_ANIMS = `
+const CSS = `
 @keyframes spin { 0%{transform:rotate(0)} 100%{transform:rotate(360deg)} }
 @keyframes sweep { 0%{transform:translateX(-120%)} 60%{transform:translateX(20%)} 100%{transform:translateX(120%)} }
-@keyframes neonPulse { 0%,100%{box-shadow:0 0 14px rgba(125,211,252,.18)} 50%{box-shadow:0 0 22px rgba(125,211,252,.32)} }
+@keyframes neonPulse { 0%,100%{box-shadow:0 0 14px rgba(34,211,238,.18)} 50%{box-shadow:0 0 22px rgba(34,211,238,.32)} }
 @keyframes cornerPulse { 0%,100%{filter:drop-shadow(0 0 5px #22d3ee)} 50%{filter:drop-shadow(0 0 10px #22d3ee)} }
 @keyframes fadeUp { 0%{opacity:0; transform:translateY(8px)} 100%{opacity:1; transform:translateY(0)} }
 @keyframes panelPop { 0%{opacity:.0; transform:scale(.985)} 100%{opacity:1; transform:scale(1)} }
 @keyframes slideInLeft { 0%{opacity:.0; transform:translateX(-10px)} 100%{opacity:1; transform:translateX(0)} }
 @keyframes slideInRight { 0%{opacity:.0; transform:translateX(10px)} 100%{opacity:1; transform:translateX(0)} }
-@keyframes floatY { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-6px)} }
 `;
 
 export default App;
+
