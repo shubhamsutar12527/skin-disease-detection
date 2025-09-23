@@ -1,556 +1,268 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useRef, useState } from "react";
 
 function App() {
-  // Core state
+  // Tabs
+  const [tab, setTab] = useState("scan");
+
+  // Scan states
   const [image, setImage] = useState(null);
+  const [result, setResult] = useState("");
   const [loading, setLoading] = useState(false);
-  const [result, setResult] = useState(null);
-  const [error, setError] = useState('');
-  const [activeTab, setActiveTab] = useState('diagnosis');
 
-  // Camera state
-  const [isCameraActive, setIsCameraActive] = useState(false);
-  const [currentCamera, setCurrentCamera] = useState('environment');
-
-  // Chat state
-  const [chatHistory, setChatHistory] = useState([]);
-  const [userMessage, setUserMessage] = useState('');
-  const [isChatting, setIsChatting] = useState(false);
-
-  const fileRef = useRef(null);
+  // Camera
+  const [cameraOn, setCameraOn] = useState(false);
+  const [facing, setFacing] = useState("environment");
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
-  const chatRef = useRef(null);
+  const fileRef = useRef(null);
 
-  useEffect(function initChat() {
-    setChatHistory([{
-      role: 'bot',
-      text: 'Arogya Mantra is ready. Load a skin image or ask a health question.'
-    }]);
-  }, []);
+  // Chat
+  const [msg, setMsg] = useState("");
+  const [chat, setChat] = useState([
+    { from: "bot", text: "Arogya Mantra is online. Ask a question or scan an image." }
+  ]);
 
-  useEffect(function autoscroll() {
-    if (chatRef.current) chatRef.current.scrollTop = chatRef.current.scrollHeight;
-  }, [chatHistory, isChatting]);
-
-  // Upload
-  function handleFileSelect(e) {
-    var file = e.target.files && e.target.files[0];
-    if (!file) return;
-    var reader = new FileReader();
-    reader.onload = function(ev) {
-      setImage(ev.target.result);
-      setResult(null);
-      setError('');
-    };
-    reader.readAsDataURL(file);
+  // Pick file
+  function pickFile() {
+    if (fileRef.current) fileRef.current.value = "";
+    fileRef.current.click();
+  }
+  function onFileChange(e) {
+    const f = e.target.files && e.target.files[0];
+    if (!f) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => { setImage(ev.target.result); setResult(""); };
+    reader.readAsDataURL(f);
   }
 
-  // Camera controls
-  function startCamera(facingMode) {
-    if (!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia)) {
-      setError('Device camera not supported.');
+  // Camera
+  function startCamera() {
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      alert("Camera not supported in this browser.");
       return;
     }
-    setIsCameraActive(true);
-    setError('');
-    navigator.mediaDevices.getUserMedia({
-      video: { facingMode: facingMode || 'environment' },
-      audio: false
-    }).then(function(stream) {
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-        videoRef.current.play();
-        setCurrentCamera(facingMode || 'environment');
-      }
-    }).catch(function() {
-      setError('Camera permission denied.');
-      setIsCameraActive(false);
-    });
+    setCameraOn(true);
+    navigator.mediaDevices.getUserMedia({ video: { facingMode: facing } })
+      .then((stream) => {
+        if (videoRef.current) videoRef.current.srcObject = stream;
+      })
+      .catch(() => {
+        alert("Camera permission denied.");
+        setCameraOn(false);
+      });
   }
   function stopCamera() {
-    var stream = videoRef.current && videoRef.current.srcObject;
-    if (stream) {
-      var tracks = stream.getTracks();
-      for (var i=0;i<tracks.length;i++) tracks[i].stop();
-    }
-    setIsCameraActive(false);
+    setCameraOn(false);
+    const s = videoRef.current && videoRef.current.srcObject;
+    if (s) s.getTracks().forEach(t => t.stop());
   }
-  function switchCamera() {
-    var next = currentCamera === 'environment' ? 'user' : 'environment';
+  function flipCamera() {
     stopCamera();
-    startCamera(next);
+    const next = facing === "user" ? "environment" : "user";
+    setFacing(next);
+    setTimeout(startCamera, 150);
   }
-  function capturePhoto() {
-    if (!videoRef.current || !canvasRef.current) return;
-    var ctx = canvasRef.current.getContext('2d');
-    canvasRef.current.width = videoRef.current.videoWidth;
-    canvasRef.current.height = videoRef.current.videoHeight;
-    ctx.drawImage(videoRef.current, 0, 0);
-    var shot = canvasRef.current.toDataURL('image/jpeg');
-    setImage(shot);
-    setResult(null);
+  function capture() {
+    const v = videoRef.current, c = canvasRef.current;
+    if (!v || !c) return;
+    c.width = v.videoWidth; c.height = v.videoHeight;
+    c.getContext("2d").drawImage(v, 0, 0);
+    const data = c.toDataURL("image/jpeg");
+    setImage(data);
+    setResult("");
     stopCamera();
   }
 
-  // Analyze
-  async function analyzeImage() {
-    if (!image) { setError('Load or capture an image first.'); return; }
-    setLoading(true); setError('');
+  // Analyze with Gemini
+  async function analyze() {
+    if (!image) return;
+    setLoading(true); setResult("");
     try {
-      var base64 = image.split(',')[1];
-      var payload = {
+      const base64 = image.split(",")[1];
+      const payload = {
         contents: [{
           role: "user",
           parts: [
-            { text: "Analyze this skin image. Return disease name, confidence (0-100), description, and a concise medical disclaimer. Keep output well-structured." },
+            { text: "Analyze this skin image and return: disease name, confidence (0-100), description, and short medical disclaimer." },
             { inlineData: { mimeType: "image/jpeg", data: base64 } }
           ]
         }]
       };
-      var res = await fetch(
-        'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=AIzaSyDbVaM34izzzi7I65DbYBsH3ssNIfiSaC0',
-        { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload) }
+      const res = await fetch(
+        "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=AIzaSyDbVaM34izzzi7I65DbYBsH3ssNIfiSaC0",
+        { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) }
       );
-      var json = await res.json();
-      var text = json && json.candidates && json.candidates[0] && json.candidates[0].content && json.candidates[0].content.parts && json.candidates[0].content.parts[0] && json.candidates[0].content.parts[0].text;
-      if (text) setResult({ analysis: text, timestamp: new Date().toLocaleString() });
-      else setError('No response from AI core.');
+      const json = await res.json();
+      const text = json && json.candidates && json.candidates[0] && json.candidates[0].content &&
+                   json.candidates[0].content.parts && json.candidates[0].content.parts[0] &&
+                   json.candidates[0].content.parts[0].text;
+      setResult(text || "No analysis returned. Try another image.");
     } catch (e) {
-      setError('Analysis failed. Network or API issue.');
-    } finally { setLoading(false); }
+      setResult("Error contacting AI. Try again.");
+    }
+    setLoading(false);
   }
 
   // Chat
-  async function sendMessage() {
-    if (!userMessage.trim()) return;
-    setChatHistory(function(prev){ return prev.concat({ role:'user', text:userMessage }); });
-    setIsChatting(true);
-    var q = userMessage;
-    setUserMessage('');
+  async function send(e) {
+    e && e.preventDefault();
+    const t = msg.trim();
+    if (!t) return;
+    setChat((c) => c.concat({ from: "user", text: t }));
+    setMsg("");
     try {
-      var payload = {
-        contents: [{
-          role: "user",
-          parts: [{ text: 'You are Arogya Mantra assistant. Answer simply and clearly: "' + q + '". Add one short safety note if needed.' }]
-        }]
-      };
-      var res = await fetch(
-        'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=AIzaSyDbVaM34izzzi7I65DbYBsH3ssNIfiSaC0',
-        { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload) }
+      const payload = { contents: [{ role: "user", parts: [{ text: "Q: " + t + "\nA:" }] }] };
+      const res = await fetch(
+        "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=AIzaSyDbVaM34izzzi7I65DbYBsH3ssNIfiSaC0",
+        { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) }
       );
-      var json = await res.json();
-      var text = json && json.candidates && json.candidates[0] && json.candidates[0].content && json.candidates[0].content.parts && json.candidates[0].content.parts[0] && json.candidates[0].content.parts[0].text;
-      setChatHistory(function(prev){ return prev.concat({ role:'bot', text: text || 'Subsystem timeout. Try again.' }); });
-    } catch (e) {
-      setChatHistory(function(prev){ return prev.concat({ role:'bot', text:'Link unstable. Retry transmission.' }); });
-    } finally { setIsChatting(false); }
+      const json = await res.json();
+      const text = json && json.candidates && json.candidates[0] &&
+                   json.candidates[0].content && json.candidates[0].content.parts &&
+                   json.candidates[0].content.parts[0] && json.candidates[0].content.parts[0].text;
+      setChat((c) => c.concat({ from: "bot", text: text || "Sorry, no response." }));
+    } catch {
+      setChat((c) => c.concat({ from: "bot", text: "Network error." }));
+    }
   }
 
-  var isMobile = typeof window !== 'undefined' ? window.innerWidth <= 820 : false;
+  // UI helpers
+  const Wrap = (p) => <div style={{maxWidth:880,margin:"0 auto",padding:16}} {...p} />;
+  const Card = (p) => <section style={{
+    background:"#12161b", border:"1px solid #263340", borderRadius:14,
+    padding:18, boxShadow:"0 0 22px #0b0f14", ...p.style
+  }}>{p.children}</section>;
 
   return (
-    <div style={rootBg}>
-      <Overlay />
-      <header style={{ paddingTop: 28, textAlign:'center' }}>
-        <h1 style={title}>
-          <span style={{color:'#f5f7fa', textShadow:'0 0 10px rgba(255,255,255,0.25)'}}>Arogya</span>
-          {' '}
-          <span style={{
-            color:'#2ef4a6',
-            textShadow:'0 0 12px rgba(46,244,166,0.9), 0 0 26px rgba(46,244,166,0.55)'}}
-          >
-            Mantra
-          </span>
-        </h1>
-        <div style={subtitle}>AI Skin Health Interface</div>
-        <div style={divider} />
-      </header>
+    <div style={{ minHeight:"100vh", background:"#07090c", color:"#e9fbff", fontFamily:"Inter,system-ui,Segoe UI,Arial,sans-serif" }}>
+      <Wrap>
+        {/* Header */}
+        <header style={{textAlign:"center", margin:"34px 0 20px"}}>
+          <div style={{fontSize:44,fontWeight:900,letterSpacing:.6}}>
+            <span style={{color:"#ffffff",textShadow:"0 0 10px #fff"}}>Arogya</span>{" "}
+            <span style={{color:"#2ef4a6",textShadow:"0 0 16px #19ffd1,0 0 30px rgba(25,255,209,.6)"}}>Mantra</span>
+          </div>
+          <div style={{opacity:.85}}>AI Skin Health Interface</div>
+          <div style={{height:2,width:180,margin:"16px auto 0",background:"linear-gradient(90deg,#22d3ee,#2ef4a6)",boxShadow:"0 0 14px #22d3ee"}} />
+        </header>
 
-      <div style={{ display:'flex', justifyContent:'center', margin:'16px 0 22px' }}>
-        <div style={tabsWrap}>
-          <Tab active={activeTab==='diagnosis'} onClick={function(){setActiveTab('diagnosis');}}>🔬 Scan</Tab>
-          <Tab active={activeTab==='chatbot'} onClick={function(){setActiveTab('chatbot');}}>🤖 Assistant</Tab>
+        {/* Tabs */}
+        <div style={{display:"flex",justifyContent:"center",gap:10,margin:"22px 0"}}>
+          <button onClick={()=>setTab("scan")} style={tabBtn(tab==="scan")}>🔬 Scan</button>
+          <button onClick={()=>setTab("chat")} style={tabBtn(tab==="chat")}>🤖 Assistant</button>
         </div>
-      </div>
 
-      {activeTab==='diagnosis' && (
-        <main style={centerWrap}>
-          <section style={panel}>
-            <PanelHeader icon="📡" text="Central Input Console" />
-            <PreviewShell>
-              {isCameraActive ? (
-                <div>
-                  <video ref={videoRef} autoPlay playsInline muted style={videoStyle} />
-                  <canvas ref={canvasRef} style={{ display:'none' }} />
-                </div>
-              ) : image ? (
-                <img src={image} alt="preview" style={imageStyle} />
-              ) : (
-                <EmptyState />
-              )}
-            </PreviewShell>
+        {/* Scan tab */}
+        {tab==="scan" && (
+          <div>
+            <Card style={{maxWidth:520, margin:"0 auto 14px"}}>
+              <div style={{border:"2px dashed #2ef4a6",borderRadius:12,minHeight:220,background:"#0e1216",
+                           display:"flex",alignItems:"center",justifyContent:"center", padding:8}}>
+                {cameraOn ? (
+                  <div style={{width:"100%"}}>
+                    <video ref={videoRef} autoPlay playsInline muted style={{width:"100%",borderRadius:10}} />
+                    <canvas ref={canvasRef} style={{display:"none"}} />
+                  </div>
+                ) : image ? (
+                  <img src={image} alt="preview" style={{maxWidth:"100%",maxHeight:260,borderRadius:10}} />
+                ) : (
+                  <div style={{opacity:.9,textAlign:"center"}}>
+                    <div style={{fontSize:38,marginBottom:10}}>📷</div>
+                    <div>Upload image or use camera</div>
+                  </div>
+                )}
+              </div>
 
-            <div style={{ display:'grid', gridTemplateColumns:isMobile?'1fr 1fr':'1fr 1fr 1fr', gap:12, marginTop:14 }}>
-              {!isCameraActive ? (
-                <React.Fragment>
-                  <Btn icon="📁" text="Load" color="#38bdf8" onClick={function(){ if (fileRef.current) fileRef.current.click(); }} />
-                  <Btn icon="🎥" text="Camera" color="#22d3ee" onClick={function(){ startCamera('environment'); }} />
-                  {!isMobile && (
-                    <Btn icon="🧠" text={loading?'Scanning…':'Analyze'} color="#06b6d4" onClick={analyzeImage} disabled={!image||loading} />
-                  )}
-                </React.Fragment>
-              ) : (
-                <React.Fragment>
-                  <Btn icon="📸" text="Capture" color="#ef4444" onClick={capturePhoto} />
-                  <Btn icon="🔄" text="Flip" color="#14b8a6" onClick={switchCamera} />
-                  <Btn icon="⛔" text="Close" color="#64748b" onClick={stopCamera} />
-                </React.Fragment>
-              )}
-            </div>
+              <div style={{display:"flex",gap:10,flexWrap:"wrap",marginTop:14}}>
+                {!cameraOn ? (
+                  <>
+                    <button onClick={pickFile} style={actionBtn("#38bdf8")}>📁 Load</button>
+                    <input ref={fileRef} type="file" accept="image/*" onChange={onFileChange} style={{display:"none"}} />
+                    <button onClick={startCamera} style={actionBtn("#2ef4a6")}>🎥 Camera</button>
+                    <button onClick={analyze} disabled={!image||loading}
+                            style={{...actionBtn("#0ea5e9"),opacity:(!image||loading)?0.6:1,cursor:(!image||loading)?"not-allowed":"pointer"}}>
+                      {loading ? "Analyzing..." : "🧠 Analyze"}
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <button onClick={capture} style={actionBtn("#ef4444")}>📸 Capture</button>
+                    <button onClick={flipCamera} style={actionBtn("#22d3ee")}>🔄 Flip</button>
+                    <button onClick={stopCamera} style={actionBtn("#64748b")}>⛔ Close</button>
+                  </>
+                )}
+              </div>
 
-            {isMobile && !isCameraActive && (
-              <Btn wide icon="🧠" text={loading?'Scanning…':'Analyze with AI'} color="#06b6d4" onClick={analyzeImage} disabled={!image||loading} style={{marginTop:12}} />
+              <div style={{marginTop:10,fontSize:13,background:"#161a20",padding:"8px 12px",borderRadius:8,color:"#9afae7"}}>
+                Tip: Bright, soft light and a steady close shot improve results.
+              </div>
+            </Card>
+
+            {result && (
+              <Card style={{maxWidth:520, margin:"0 auto 14px", color:"#bffdf4"}}>
+                <div style={{fontWeight:700, marginBottom:6}}>Analysis</div>
+                <pre style={{whiteSpace:"pre-wrap", margin:0, fontFamily:"inherit"}}>{result}</pre>
+              </Card>
             )}
 
-            <input ref={fileRef} type="file" accept="image/*" onChange={handleFileSelect} style={{ display:'none' }} />
-            <InfoStrip />
-          </section>
+            <Card style={{maxWidth:520, margin:"0 auto 18px", background:"#12161b"}}>
+              <div style={{fontWeight:700, marginBottom:6}}>About</div>
+              <ul style={{margin:0,paddingLeft:18,opacity:.95}}>
+                <li>Helps understand common skin conditions from a photo.</li>
+                <li>Educational support only; not a medical diagnosis.</li>
+                <li>No images are stored by the app.</li>
+                <li>See a clinician for serious or uncertain cases.</li>
+              </ul>
+            </Card>
+          </div>
+        )}
 
-          {(result || error || loading) && (
-            <section style={panel2}>
-              <PanelHeader icon="📊" text="Diagnostic Output" />
-              {loading && <Analyzing />}
-              {error && <ErrorBox text={error} />}
-              {result && <ResultBox result={result} />}
-            </section>
-          )}
-
-          <section style={panel2}>
-            <PanelHeader icon="ℹ️" text="About Arogya Mantra" />
-            <ul style={aboutList}>
-              <li><strong>Purpose:</strong> A learning and triage aid that offers AI‑generated explanations for common skin presentations from a photo.</li>
-              <li><strong>How it helps:</strong> Summarizes likely conditions, confidence, typical features, and simple care tips in seconds.</li>
-              <li><strong>Important:</strong> This is not a diagnosis. For persistent, painful, spreading, or worrisome lesions, consult a licensed clinician.</li>
-              <li><strong>Privacy:</strong> Images are analyzed temporarily to generate a response and are not stored by the app.</li>
-            </ul>
-          </section>
-        </main>
-      )}
-
-      {activeTab==='chatbot' && (
-        <div style={centerWrap}>
-          <section style={panel}>
-            <PanelHeader icon="🧬" text="Skin Health Assistant" />
-            <div ref={chatRef} style={chatBox}>
-              {chatHistory.map(function(m,i){
-                return <Bubble key={i} me={m.role==='user'}>{m.text}</Bubble>;
-              })}
-              {isChatting && <div style={{opacity:.8,fontSize:13}}>…connecting</div>}
+        {/* Chat tab */}
+        {tab==="chat" && (
+          <Card style={{maxWidth:560, margin:"0 auto"}}>
+            <div style={{fontWeight:700, marginBottom:8}}>Skin Health Assistant</div>
+            <div style={{minHeight:200,maxHeight:320,overflowY:"auto",background:"#0f1318",borderRadius:8,padding:"8px 6px", marginBottom:10}}>
+              {chat.map((m,i)=>(
+                <div key={i} style={{textAlign:m.from==="user"?"right":"left",margin:"8px 0"}}>
+                  <span style={{
+                    display:"inline-block", maxWidth:"78%", wordBreak:"break-word",
+                    background: m.from==="user" ? "linear-gradient(90deg,#2ef4a6,#22d3ee 70%)" : "#1c222a",
+                    color: m.from==="user" ? "#0b1511" : "#c9fff6",
+                    padding:"8px 12px", borderRadius:8, boxShadow: m.from==="user" ? "0 0 10px #18f8c8" : "0 0 8px #0b1116"
+                  }}>{m.text}</span>
+                </div>
+              ))}
             </div>
-            <div style={{ display:'flex', gap:10, marginTop:12 }}>
-              <input
-                type="text" value={userMessage}
-                onChange={function(e){ setUserMessage(e.target.value); }}
-                onKeyDown={function(e){ if (e.key==='Enter') sendMessage(); }}
-                placeholder="Ask about skin care, symptoms, treatments…"
-                style={chatInput}
-              />
-              <Btn icon="🚀" text="Send" color="#38bdf8" onClick={sendMessage} disabled={isChatting || !userMessage.trim()} />
-            </div>
-          </section>
-        </div>
-      )}
-
-      <style dangerouslySetInnerHTML={{__html: CSS}} />
+            <form onSubmit={send} style={{display:"flex",gap:8}}>
+              <input value={msg} onChange={(e)=>setMsg(e.target.value)} placeholder="Ask about symptoms, care, sunscreen..."
+                     style={{flex:1,padding:"10px 12px",borderRadius:8,border:"2px solid #22d3ee"}} />
+              <button type="submit" style={{padding:"0 18px",borderRadius:8,border:"none",
+                background:"linear-gradient(90deg,#2ef4a6,#22d3ee 70%)", color:"#081412", fontWeight:800, cursor:"pointer"}}>Send</button>
+            </form>
+          </Card>
+        )}
+      </Wrap>
     </div>
   );
 }
 
-/* ——— Black theme ——— */
-var rootBg = {
-  minHeight:'100vh',
-  backgroundColor:'#050607',
-  color:'#f0fbff',
-  overflowX:'hidden',
-  background:
-   'radial-gradient(circle at 18% 22%, rgba(34,211,238,0.14) 0, transparent 55%),' +
-   'radial-gradient(circle at 82% 30%, rgba(56,189,248,0.12) 0, transparent 50%),' +
-   'linear-gradient(transparent 98%, rgba(148,163,184,0.10) 98%),' +
-   'linear-gradient(90deg, transparent 98%, rgba(148,163,184,0.10) 98%)',
-  backgroundSize:'1000px 1000px, 1000px 1000px, 36px 36px, 36px 36px'
-};
-var centerWrap = { maxWidth:880, margin:'0 auto', padding:'0 14px 60px' };
-var title = { fontSize:52, fontWeight:900, letterSpacing:.4, margin:0 };
-var subtitle = { marginTop:6, fontSize:14, opacity:.9, color:'#c7f9ff' };
-var divider = { height:3, width:240, margin:'16px auto 10px', background:'linear-gradient(90deg,#22d3ee,#14b8a6)', filter:'blur(.35px)', borderRadius:2, boxShadow:'0 0 14px #22d3ee' };
-
-var tabsWrap = {
-  padding:6, display:'flex', gap:6,
-  background:'linear-gradient(135deg, rgba(8,10,12,0.8), rgba(12,14,16,0.8))',
-  border:'1px solid rgba(56,189,248,0.35)',
-  borderRadius:16, boxShadow:'0 0 18px rgba(34,211,238,.18)'
-};
-
-function Overlay(){
-  return (
-    <div>
-      <div style={{
-        pointerEvents:'none', position:'fixed', inset:0,
-        background:'repeating-linear-gradient(0deg, rgba(255,255,255,0.02) 0, rgba(255,255,255,0.02) 2px, transparent 2px, transparent 4px)',
-        mixBlendMode:'overlay', opacity:.20
-      }} />
-      <div style={{
-        pointerEvents:'none', position:'fixed', inset:0,
-        background:'radial-gradient(ellipse at center, transparent 60%, rgba(0,0,0,0.62) 100%)'
-      }} />
-    </div>
-  );
+/* Styles helpers */
+function tabBtn(active) {
+  return {
+    background: active ? "#141921" : "#22252a",
+    color: active ? "#2ef4a6" : "#e4fdfe",
+    border: active ? "2px solid #2ef4a6" : "2px solid #222a2e",
+    fontWeight:800, fontSize:16, padding:"10px 18px", borderRadius:8,
+    boxShadow: active ? "0 0 12px #27f6c4" : undefined,
+    cursor:"pointer"
+  };
 }
-
-function Tab(props){
-  return (
-    <button onClick={props.onClick} style={{
-      padding:'10px 18px', borderRadius:12,
-      border:'1px solid rgba(56,189,248,0.35)',
-      background: props.active ? 'linear-gradient(135deg, rgba(56,189,248,0.28), rgba(34,211,238,0.28))' : 'transparent',
-      color:'#e6faff', cursor:'pointer', transition:'all .25s',
-      boxShadow: props.active ? '0 0 14px rgba(34,211,238,.6)' : 'none'
-    }}>
-      {props.children}
-    </button>
-  );
+function actionBtn(color) {
+  return {
+    background: "linear-gradient(100deg,"+color+",#0f2021 88%)",
+    color:"#f5fefc", fontWeight:700, borderRadius:8, border:"none",
+    boxShadow:"0 0 10px "+color, padding:"12px 16px", fontSize:15, cursor:"pointer"
+  };
 }
-
-var panel = {
-  background:'linear-gradient(135deg, rgba(9,11,13,0.9), rgba(13,16,19,0.9))',
-  border:'1px solid rgba(56,189,248,0.28)',
-  borderRadius:16, position:'relative', boxShadow:'0 0 18px rgba(34,211,238,.14)',
-  padding:18, animation:'panelPop .45s ease-out both'
-};
-var panel2 = {
-  background:'linear-gradient(135deg, rgba(9,11,13,0.9), rgba(13,16,19,0.9))',
-  border:'1px solid rgba(56,189,248,0.28)',
-  borderRadius:16, position:'relative', boxShadow:'0 0 18px rgba(34,211,238,.14)',
-  padding:18, marginTop:16
-};
-
-function PanelHeader(props){
-  return (
-    <div style={{display:'flex',alignItems:'center',gap:10, marginBottom:10, fontSize:16, opacity:.98}}>
-      <span>{props.icon}</span>
-      <span>{props.text}</span>
-      <div style={{flex:1}} />
-      <div style={{height:2, width:120, background:'linear-gradient(90deg,#22d3ee,#14b8a6)', boxShadow:'0 0 10px #22d3ee'}} />
-    </div>
-  );
-}
-
-function PreviewShell(props){
-  return (
-    <div style={{
-      position:'relative',
-      border:'1px dashed rgba(56,189,248,0.35)',
-      borderRadius:16, minHeight:260,
-      display:'flex', alignItems:'center', justifyContent:'center',
-      background:'linear-gradient(135deg, rgba(12,14,16,0.35), rgba(16,18,20,0.55))',
-      boxShadow:'0 0 22px rgba(56,189,248,0.20)',
-      animation:'neonPulse 2.4s ease-in-out infinite'
-    }}>
-      {['tl','tr','bl','br'].map(function(_,i){
-        return (
-          <div key={i} style={{
-            position:'absolute', width:30, height:30,
-            borderTop: i<2?'2px solid #22d3ee':'none',
-            borderLeft: i%2===0?'2px solid #22d3ee':'none',
-            borderRight: i%2===1?'2px solid #22d3ee':'none',
-            borderBottom: i>=2?'2px solid #22d3ee':'none',
-            top: i<2?10:'auto', bottom:i>=2?10:'auto',
-            left:i%2===0?10:'auto', right:i%2===1?10:'auto',
-            filter:'drop-shadow(0 0 8px #22d3ee)',
-            animation:'cornerPulse 1.8s ease-in-out infinite'
-          }} />
-        );
-      })}
-      <div style={{position:'relative', zIndex:1, width:'100%'}}>
-        {props.children}
-      </div>
-      <div style={{
-        position:'absolute', inset:0,
-        background:'linear-gradient(120deg, transparent 20%, rgba(34,211,238,0.09) 45%, transparent 70%)',
-        transform:'translateX(-120%)',
-        animation:'sweep 3.2s ease-in-out infinite'
-      }} />
-    </div>
-  );
-}
-
-var videoStyle = { width:'100%', maxHeight:340, borderRadius:12, objectFit:'cover', outline:'1px solid rgba(56,189,248,0.28)' };
-var imageStyle = { maxWidth:'100%', maxHeight:340, borderRadius:12, outline:'1px solid rgba(56,189,248,0.28)' };
-
-function EmptyState(){
-  return (
-    <div style={{ textAlign:'center', opacity:.9, padding:'28px 0'}}>
-      <div style={{ fontSize:46, marginBottom:8 }}>📷</div>
-      <div>Load image or activate camera</div>
-    </div>
-  );
-}
-
-function Btn(props){
-  return (
-    <button onClick={props.onClick} disabled={props.disabled} style={{
-      padding: props.wide?'14px 16px':'12px 14px',
-      borderRadius:12,
-      border:'1px solid rgba(56,189,248,0.35)',
-      background:'linear-gradient(135deg, ' + toRGBA(props.color,.34) + ', ' + toRGBA(shade(props.color),.34) + ')',
-      color:'#eafcff', cursor:props.disabled?'not-allowed':'pointer',
-      transition:'transform .15s ease, box-shadow .2s ease, filter .2s ease',
-      width: props.wide?'100%':'auto',
-      filter: props.disabled ? 'grayscale(.2) opacity(.8)' : 'none',
-      boxShadow:'0 0 16px rgba(34,211,238,.20)',
-      ...(props.style || {})
-    }}>
-      <span style={{marginRight:8}}>{props.icon}</span>{props.text}
-    </button>
-  );
-}
-
-function InfoStrip(){
-  return (
-    <div style={{
-      marginTop:12, padding:'10px 12px',
-      borderRadius:10,
-      background:'linear-gradient(90deg, rgba(2,132,199,0.18), rgba(13,148,136,0.18))',
-      border:'1px solid rgba(56,189,248,0.30)', fontSize:13
-    }}>
-      Tip: Use diffused light; keep the lesion in focus; fill the frame for best inference.
-    </div>
-  );
-}
-
-function Analyzing(){
-  return (
-    <div style={{ position:'relative', padding:'28px 14px', textAlign:'center' }}>
-      <div style={{
-        width:120, height:120, borderRadius:'50%', margin:'0 auto 12px',
-        border:'3px solid rgba(56,189,248,0.28)', position:'relative',
-        boxShadow:'0 0 18px rgba(34,211,238,0.28)'
-      }}>
-        <div style={{
-          position:'absolute', inset:8, borderRadius:'50%',
-          background:'conic-gradient(from 0deg, rgba(34,211,238,.55), rgba(14,165,233,.0) 40%)',
-          filter:'blur(1px)', animation:'spin 1.6s linear infinite'
-        }} />
-        <div style={{
-          position:'absolute', inset:0, borderRadius:'50%',
-          border:'2px dashed rgba(56,189,248,0.35)', animation:'spin 6s linear infinite reverse'
-        }} />
-      </div>
-      <div>Analyzing dermal pattern…</div>
-    </div>
-  );
-}
-
-function ErrorBox(props){
-  return (
-    <div style={{
-      border:'1px solid rgba(248,113,113,0.35)',
-      background:'linear-gradient(135deg, rgba(127,29,29,0.35), rgba(69,10,10,0.35))',
-      padding:14, borderRadius:12
-    }}>
-      ❌ {props.text}
-    </div>
-  );
-}
-
-function ResultBox(props){
-  return (
-    <div style={{ animation:'fadeUp .4s ease-out both' }}>
-      <div style={{
-        border:'1px solid rgba(14,165,233,0.35)',
-        background:'linear-gradient(135deg, rgba(2,20,30,0.55), rgba(6,37,46,0.45))',
-        padding:14, borderRadius:12, marginBottom:12
-      }}>
-        <pre style={{
-          margin:0, whiteSpace:'pre-wrap',
-          fontFamily:'ui-monospace, SFMono-Regular, Menlo, monospace',
-          lineHeight:1.6, color:'#d1faff'
-        }}>{props.result.analysis}</pre>
-      </div>
-      <div style={{ fontSize:12, opacity:.9, textAlign:'right' }}>⏱ {props.result.timestamp}</div>
-      <div style={{
-        marginTop:10, padding:10, fontSize:12, borderRadius:10,
-        border:'1px solid rgba(250,204,21,0.35)',
-        background:'linear-gradient(135deg, rgba(113,63,18,0.35), rgba(180,83,9,0.25))'
-      }}>
-        ⚠️ Educational tool only. For diagnosis/treatment, consult a licensed clinician.
-      </div>
-    </div>
-  );
-}
-
-function Bubble(props){
-  return (
-    <div style={{
-      display:'flex', justifyContent: props.me?'flex-end':'flex-start',
-      marginBottom:10, animation: props.me?'slideInRight .35s ease-out both':'slideInLeft .35s ease-out both'
-    }}>
-      <div style={{
-        maxWidth:'78%', padding:'10px 14px', borderRadius:12,
-        border:'1px solid rgba(56,189,248,0.30)',
-        background: props.me
-          ? 'linear-gradient(135deg, rgba(56,189,248,0.35), rgba(34,211,238,0.35))'
-          : 'linear-gradient(135deg, rgba(12,14,16,0.85), rgba(16,18,20,0.85))',
-        fontSize:14, lineHeight:1.5
-      }}>
-        {props.children}
-      </div>
-    </div>
-  );
-}
-
-var chatBox = {
-  height: 420, overflowY:'auto', border:'1px solid rgba(56,189,248,0.32)',
-  borderRadius:14, padding:14,
-  background:'linear-gradient(135deg, rgba(12,14,16,0.75), rgba(16,18,20,0.65))',
-  boxShadow:'0 0 22px rgba(34,211,238,0.20)'
-};
-var chatInput = {
-  flex:1, padding:'12px 14px', borderRadius:12,
-  border:'1px solid rgba(56,189,248,0.35)',
-  background:'rgba(12,14,16,0.6)', color:'#eafcff', outline:'none'
-};
-
-function toRGBA(hexColor, a){
-  if (hexColor.indexOf('rgb')===0) return hexColor;
-  var c = hexColor.replace('#','');
-  var n = parseInt(c,16);
-  var r=(n>>16)&255, g=(n>>8)&255, b=n&255;
-  var alpha = typeof a==='number' ? a : 1;
-  return 'rgba('+r+','+g+','+b+','+alpha+')';
-}
-function shade(hexColor){
-  var c = hexColor.replace('#','');
-  var n = parseInt(c,16);
-  var r=(n>>16)&255, g=(n>>8)&255, b=n&255;
-  function s(v){ return Math.max(0, v-28); }
-  return '#'+[s(r),s(g),s(b)].map(function(x){return x.toString(16).padStart(2,'0');}).join('');
-}
-
-var aboutList = {
-  margin:0, paddingLeft:18, lineHeight:1.65, color:'#d7fbff', fontSize:14
-};
-
-var CSS = "\
-@keyframes spin { 0%{transform:rotate(0)} 100%{transform:rotate(360deg)} }\
-@keyframes sweep { 0%{transform:translateX(-120%)} 60%{transform:translateX(20%)} 100%{transform:translateX(120%)} }\
-@keyframes neonPulse { 0%,100%{box-shadow:0 0 16px rgba(34,211,238,.20)} 50%{box-shadow:0 0 26px rgba(34,211,238,.36)} }\
-@keyframes cornerPulse { 0%,100%{filter:drop-shadow(0 0 7px #22d3ee)} 50%{filter:drop-shadow(0 0 12px #22d3ee)} }\
-@keyframes fadeUp { 0%{opacity:0; transform:translateY(8px)} 100%{opacity:1; transform:translateY(0)} }\
-@keyframes panelPop { 0%{opacity:.0; transform:scale(.985)} 100%{opacity:1; transform:scale(1)} }\
-@keyframes slideInLeft { 0%{opacity:.0; transform:translateX(-10px)} 100%{opacity:1; transform:translateX(0)} }\
-@keyframes slideInRight { 0%{opacity:.0; transform:translateX(10px)} 100%{opacity:1; transform:translateX(0)} }\
-";
 
 export default App;
