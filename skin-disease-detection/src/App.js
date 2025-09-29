@@ -1,95 +1,136 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 
-function App() {
-  const [activeTab, setActiveTab] = useState('scan');
+// ================= Configuration (copied from working file) =================
+// WARNING: Do not expose real keys in public repos. Use a backend proxy for production.
+const USER_API_KEY = 'AIzaSyClr14CAWBVITR6oi24fKkHxkPBAuc5pEI';
+const GEMINI_VISION_MODEL = 'gemini-2.5-flash-preview-05-20';
+const API_BASE = 'https://generativelanguage.googleapis.com/v1beta/models';
+// ============================================================================
+
+const App = () => {
+  // UI state
+  const [activeTab, setActiveTab] = useState('diagnosis');
+
+  // Image/analysis state
   const [image, setImage] = useState(null);
   const [loading, setLoading] = useState(false);
-  const [result, setResult] = useState(null);
+  const [result, setResult] = useState(null); // JSON result from analysis
   const [error, setError] = useState('');
-  const [apiTest, setApiTest] = useState(null);
 
-  const fileInputRef = useRef(null);
+  // Camera state
+  const [isCameraActive, setIsCameraActive] = useState(false);
+  const [currentCamera, setCurrentCamera] = useState('environment');
 
-  // TEST API FUNCTION - This will tell us exactly what's wrong
-  const testAPI = async () => {
-    setApiTest('Testing API...');
-    
-    try {
-      // Test 1: Basic API connectivity
-      console.log('Testing basic API...');
-      const testResponse = await fetch(
-        'https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=AIzaSyClr14CAWBVITR6oi24fKkHxkPBAuc5pEI',
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            contents: [{
-              parts: [{ text: 'Hello, this is a test. Please respond with "API working successfully".' }]
-            }]
-          })
+  // Chat state
+  const [chatHistory, setChatHistory] = useState([
+    {
+      role: 'bot',
+      text:
+        'Hello! I am your AI skin health assistant. Ask me anything about common skin conditions and treatments.',
+    },
+  ]);
+  const [userMessage, setUserMessage] = useState('');
+  const [isChatting, setIsChatting] = useState(false);
+
+  // Refs
+  const fileRef = useRef(null);
+  const videoRef = useRef(null);
+  const canvasRef = useRef(null);
+  const chatRef = useRef(null);
+
+  // Auto-scroll chat
+  useEffect(() => {
+    if (chatRef.current) {
+      chatRef.current.scrollTop = chatRef.current.scrollHeight;
+    }
+  }, [chatHistory]);
+
+  // Responsive flag
+  const useIsMobile = () => {
+    const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+    useEffect(() => {
+      const handleResize = () => setIsMobile(window.innerWidth < 768);
+      window.addEventListener('resize', handleResize);
+      return () => window.removeEventListener('resize', handleResize);
+    }, []);
+    return isMobile;
+  };
+  const isMobile = useIsMobile();
+
+  // File selection
+  const handleFileSelect = (e) => {
+    stopCamera();
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (evt) => {
+      setImage(evt.target.result);
+      setResult(null);
+      setError('');
+    };
+    reader.readAsDataURL(file);
+  };
+
+  // Camera controls
+  const startCamera = (facingMode) => {
+    if (!navigator.mediaDevices?.getUserMedia) {
+      setError('Camera not supported in this browser.');
+      return;
+    }
+    stopCamera();
+    setIsCameraActive(true);
+    setError('');
+    setImage(null);
+    setResult(null);
+
+    navigator.mediaDevices
+      .getUserMedia({ video: { facingMode: facingMode || 'environment' }, audio: false })
+      .then((stream) => {
+        if (videoRef.current) {
+          videoRef.current.srcObject = stream;
+          videoRef.current.play();
+          setCurrentCamera(facingMode || 'environment');
         }
-      );
+      })
+      .catch(() => {
+        setError('Camera access denied. Please allow camera permissions.');
+        setIsCameraActive(false);
+      });
+  };
 
-      console.log('Basic API Status:', testResponse.status);
-
-      if (testResponse.ok) {
-        const data = await testResponse.json();
-        console.log('Basic API Response:', data);
-        
-        // Test 2: Check available models
-        console.log('Checking available models...');
-        const modelsResponse = await fetch(
-          'https://generativelanguage.googleapis.com/v1beta/models?key=AIzaSyClr14CAWBVITR6oi24fKkHxkPBAuc5pEI'
-        );
-        
-        if (modelsResponse.ok) {
-          const modelsData = await modelsResponse.json();
-          console.log('Available Models:', modelsData);
-          
-          const visionModels = modelsData.models?.filter(model => 
-            model.name.includes('vision') || 
-            model.supportedGenerationMethods?.includes('generateContent')
-          ) || [];
-          
-          setApiTest(`✅ API Working! 
-          
-Available Models: ${modelsData.models?.length || 0}
-Vision Models Found: ${visionModels.length}
-
-Models: ${modelsData.models?.map(m => m.name).join(', ') || 'None'}
-
-${visionModels.length > 0 ? 'Vision analysis should work!' : 'No vision models - subscription may not include vision API'}`);
-          
-        } else {
-          setApiTest(`✅ Basic API works, but cannot list models. Status: ${modelsResponse.status}`);
-        }
-      } else {
-        const errorData = await testResponse.json();
-        console.error('API Test Failed:', errorData);
-        setApiTest(`❌ API Test Failed: ${errorData.error?.message || 'Unknown error'}`);
-      }
-    } catch (err) {
-      console.error('API Test Error:', err);
-      setApiTest(`❌ Connection Error: ${err.message}`);
+  const stopCamera = () => {
+    if (videoRef.current?.srcObject) {
+      videoRef.current.srcObject.getTracks().forEach((t) => t.stop());
+      setIsCameraActive(false);
     }
   };
 
-  const handleFileSelect = (event) => {
-    const file = event.target.files[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        setImage(e.target.result);
-        setResult(null);
-        setError('');
-      };
-      reader.readAsDataURL(file);
-    }
+  const switchCamera = () => {
+    const next = currentCamera === 'environment' ? 'user' : 'environment';
+    startCamera(next);
   };
 
+  const capturePhoto = () => {
+    if (!videoRef.current || !canvasRef.current) return;
+    const ctx = canvasRef.current.getContext('2d');
+    canvasRef.current.width = videoRef.current.videoWidth;
+    canvasRef.current.height = videoRef.current.videoHeight;
+    ctx.drawImage(videoRef.current, 0, 0, canvasRef.current.width, canvasRef.current.height);
+    const dataUrl = canvasRef.current.toDataURL('image/jpeg');
+    setImage(dataUrl);
+    setResult(null);
+    setError('');
+    stopCamera();
+  };
+
+  // ====================== Analysis with Gemini ======================
   const analyzeImage = async () => {
     if (!image) {
       setError('Please select an image first.');
+      return;
+    }
+    if (!USER_API_KEY) {
+      setError('Missing API key.');
       return;
     }
 
@@ -98,418 +139,532 @@ ${visionModels.length > 0 ? 'Vision analysis should work!' : 'No vision models -
     setResult(null);
 
     try {
-      const base64Image = image.split(',')[1];
-      
-      // Try the most likely working combinations
-      const attempts = [
-        {
-          url: 'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=AIzaSyClr14CAWBVITR6oi24fKkHxkPBAuc5pEI',
-          model: 'gemini-1.5-flash (v1beta)'
-        },
-        {
-          url: 'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro:generateContent?key=AIzaSyClr14CAWBVITR6oi24fKkHxkPBAuc5pEI',
-          model: 'gemini-1.5-pro (v1beta)'
-        },
-        {
-          url: 'https://generativelanguage.googleapis.com/v1beta/models/gemini-pro-vision:generateContent?key=AIzaSyClr14CAWBVITR6oi24fKkHxkPBAuc5pEI',
-          model: 'gemini-pro-vision (v1beta)'
-        },
-        {
-          url: 'https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=AIzaSyClr14CAWBVITR6oi24fKkHxkPBAuc5pEI',
-          model: 'gemini-1.5-flash (v1)'
-        }
-      ];
+      const base64 = image.split(',')[1];
 
-      let success = false;
+      const apiUrl = `${API_BASE}/${GEMINI_VISION_MODEL}:generateContent?key=${USER_API_KEY}`;
 
-      for (const attempt of attempts) {
-        try {
-          console.log(`Trying: ${attempt.model}`);
-          
-          const response = await fetch(attempt.url, {
-            method: 'POST',
-            headers: { 
-              'Content-Type': 'application/json',
-              'x-goog-user-project': '798774183029'
+      // Prompt and schema from the working file
+      const prompt =
+        "Analyze this detailed image of a skin area. Identify the most likely skin condition or state (e.g., 'Acne', 'Eczema', 'Psoriasis', 'Fungal Infection', or 'Healthy Skin'). Provide the response as a single JSON object. The description should be simple and suitable for a non-expert.";
+
+      const payload = {
+        contents: [
+          {
+            role: 'user',
+            parts: [
+              { text: prompt },
+              { inlineData: { mimeType: 'image/jpeg', data: base64 } },
+            ],
+          },
+        ],
+        generationConfig: {
+          responseMimeType: 'application/json',
+          responseSchema: {
+            type: 'OBJECT',
+            properties: {
+              diseaseName: {
+                type: 'STRING',
+                description:
+                  "The most probable skin condition identified, or 'Healthy Skin'.",
+              },
+              confidenceScore: {
+                type: 'INTEGER',
+                description: 'Confidence score from 0 to 100.',
+              },
+              description: {
+                type: 'STRING',
+                description: 'A brief, simple description of the finding.',
+              },
+              disclaimer: {
+                type: 'STRING',
+                description:
+                  "A mandatory disclaimer: 'This is not medical advice. Consult a doctor.'",
+              },
             },
-            body: JSON.stringify({
-              contents: [{
-                parts: [
-                  {
-                    text: "Analyze this skin image. Provide: 1) What you see 2) Possible skin conditions 3) Recommendations 4) Medical disclaimer"
-                  },
-                  {
-                    inlineData: {
-                      mimeType: "image/jpeg",
-                      data: base64Image
-                    }
-                  }
-                ]
-              }]
-            })
+          },
+        },
+      };
+
+      // Retry with exponential backoff (as in working file)
+      const maxRetries = 5;
+      let retry = 0;
+      let parsed = null;
+
+      while (retry < maxRetries) {
+        try {
+          const resp = await fetch(apiUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
           });
 
-          console.log(`${attempt.model} Status:`, response.status);
-
-          if (response.ok) {
-            const data = await response.json();
-            console.log(`${attempt.model} Response:`, data);
-            
-            const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
-            
-            if (text && text.trim()) {
-              setResult({
-                text: text,
-                model: attempt.model,
-                timestamp: new Date().toLocaleString()
-              });
-              success = true;
-              console.log(`✅ Success with: ${attempt.model}`);
-              break;
-            }
-          } else {
-            const errorData = await response.json();
-            console.log(`❌ ${attempt.model} failed:`, errorData.error?.message);
+          if (resp.status === 429) {
+            const delay = Math.pow(2, retry) * 1000;
+            await new Promise((r) => setTimeout(r, delay));
+            retry++;
+            continue;
           }
-        } catch (err) {
-          console.log(`❌ ${attempt.model} error:`, err.message);
+
+          if (!resp.ok) {
+            throw new Error(`HTTP ${resp.status}`);
+          }
+
+          const json = await resp.json();
+          const text = json?.candidates?.[0]?.content?.parts?.[0]?.text;
+          if (!text) {
+            throw new Error('Invalid response structure from AI.');
+          }
+
+          parsed = JSON.parse(text);
+          break;
+        } catch (e) {
+          const delay = Math.pow(2, retry) * 1000;
+          await new Promise((r) => setTimeout(r, delay));
+          retry++;
+          if (retry === maxRetries) throw e;
         }
       }
 
-      if (!success) {
-        setError(`All attempts failed. Possible issues:
-
-1. **Vision API not enabled**: Your subscription might not include vision models
-2. **API Key permissions**: May need to enable Gemini API in Google Cloud
-3. **Regional restrictions**: Vision API might not be available in your region
-
-Check the browser console (F12) for detailed error messages.`);
+      if (parsed) {
+        setResult({
+          ...parsed,
+          timestamp: new Date().toLocaleString(),
+        });
+      } else {
+        setError('Analysis failed to return a valid structured response.');
       }
-
-    } catch (err) {
-      setError(`Analysis failed: ${err.message}`);
+    } catch (e) {
+      setError('Analysis failed: Could not connect to AI service. ' + e.message);
     } finally {
       setLoading(false);
     }
   };
 
+  // ====================== Chat with Gemini ======================
+  const sendMessage = async () => {
+    if (!userMessage.trim() || isChatting) return;
+    if (!USER_API_KEY) {
+      setChatHistory((prev) => [
+        ...prev,
+        { role: 'bot', text: 'Missing API key.' },
+      ]);
+      return;
+    }
+
+    const entry = { role: 'user', text: userMessage.trim() };
+    setChatHistory((prev) => [...prev, entry]);
+    setUserMessage('');
+    setIsChatting(true);
+
+    try {
+      const apiUrl = `${API_BASE}/${GEMINI_VISION_MODEL}:generateContent?key=${USER_API_KEY}`;
+      const prompt = `You are a helpful, friendly skin health assistant. Answer this question briefly, clearly, and simply for a non-technical audience: "${entry.text}". Always remind the user that you are not a doctor and they should consult a professional for a diagnosis.`;
+
+      const payload = {
+        contents: [{ role: 'user', parts: [{ text: prompt }] }],
+      };
+
+      const maxRetries = 5;
+      let retry = 0;
+      let botText =
+        'Sorry, I could not process your question due to a network error.';
+
+      while (retry < maxRetries) {
+        try {
+          const resp = await fetch(apiUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+          });
+
+          if (resp.status === 429) {
+            const delay = Math.pow(2, retry) * 1000;
+            await new Promise((r) => setTimeout(r, delay));
+            retry++;
+            continue;
+          }
+
+          const json = await resp.json();
+          const text = json?.candidates?.[0]?.content?.parts?.[0]?.text;
+          botText = text || 'Sorry, I received an unclear response from the AI.';
+          break;
+        } catch (e) {
+          const delay = Math.pow(2, retry) * 1000;
+          await new Promise((r) => setTimeout(r, delay));
+          retry++;
+          if (retry === maxRetries) throw e;
+        }
+      }
+
+      setChatHistory((prev) => [...prev, { role: 'bot', text: botText }]);
+    } catch {
+      setChatHistory((prev) => [
+        ...prev,
+        {
+          role: 'bot',
+          text:
+            'I am experiencing severe technical difficulties. Please try again later.',
+        },
+      ]);
+    } finally {
+      setIsChatting(false);
+    }
+  };
+
   return (
-    <div style={styles.container}>
-      <header style={styles.header}>
-        <h1 style={styles.title}>
-          <span style={styles.titlePrimary}>Arogya</span>{' '}
-          <span style={styles.titleSecondary}>Mantra</span>
-        </h1>
-        <p style={styles.subtitle}>AI-Powered Skin Health Analysis</p>
-      </header>
+    <div className="min-h-screen bg-gradient-to-br from-indigo-500 to-purple-700 p-4 sm:p-8 font-sans">
+      <div className="max-w-6xl mx-auto">
 
-      {/* API Test Section */}
-      <div style={styles.testSection}>
-        <button onClick={testAPI} style={styles.testButton}>
-          🔧 Test API Connection
-        </button>
-        {apiTest && (
-          <div style={styles.testResult}>
-            <pre>{apiTest}</pre>
-          </div>
-        )}
-      </div>
+        {/* Header */}
+        <header className="text-center mb-8 text-white p-4">
+          <div className="text-5xl mb-2">🩺</div>
+          <h1 className="text-3xl sm:text-4xl font-extrabold mb-2 tracking-wide">
+            Arogya Mitra
+          </h1>
+          <p className="text-lg opacity-90">
+            AI-Powered Skin Health Analysis & Assistant
+          </p>
+        </header>
 
-      <main style={styles.content}>
-        <div style={styles.card}>
-          <div style={styles.cardHeader}>
-            <h3 style={styles.cardTitle}>📸 Image Analysis</h3>
-          </div>
-          
-          <div style={styles.imageContainer}>
-            {image ? (
-              <div style={styles.imagePreview}>
-                <img src={image} alt="Skin for analysis" style={styles.image} />
-                <p style={styles.imageStatus}>✅ Image ready for analysis</p>
-              </div>
-            ) : (
-              <div style={styles.placeholder}>
-                <div style={styles.placeholderIcon}>🖼️</div>
-                <h4>Upload Image for Analysis</h4>
-                <p>Select a clear skin image for AI analysis</p>
-              </div>
-            )}
-          </div>
-
-          <div style={styles.buttonContainer}>
-            <button style={styles.button} onClick={() => fileInputRef.current?.click()}>
-              📁 Upload Image
-            </button>
-            <button 
-              style={(!image || loading) ? 
-                {...styles.analyzeButton, opacity: 0.6, cursor: 'not-allowed'} : 
-                styles.analyzeButton
-              }
-              onClick={analyzeImage}
-              disabled={!image || loading}
+        {/* Tabs */}
+        <div className="flex justify-center mb-8">
+          <div className="bg-white/20 backdrop-blur-sm rounded-xl p-2 flex space-x-2 shadow-lg">
+            <button
+              onClick={() => setActiveTab('diagnosis')}
+              className={`px-6 py-2 rounded-lg font-semibold transition-all duration-300 ${
+                activeTab === 'diagnosis'
+                  ? 'bg-white text-indigo-700 shadow-md'
+                  : 'text-white/80 hover:bg-white/10'
+              }`}
             >
-              {loading ? '🔄 Analyzing...' : '🧠 Analyze Image'}
+              🔬 Skin Analysis
+            </button>
+            <button
+              onClick={() => setActiveTab('chatbot')}
+              className={`px-6 py-2 rounded-lg font-semibold transition-all duration-300 ${
+                activeTab === 'chatbot'
+                  ? 'bg-white text-indigo-700 shadow-md'
+                  : 'text-white/80 hover:bg-white/10'
+              }`}
+            >
+              🤖 AI Assistant
             </button>
           </div>
-
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept="image/*"
-            onChange={handleFileSelect}
-            style={{ display: 'none' }}
-          />
         </div>
 
-        {(loading || result || error) && (
-          <div style={styles.card}>
-            <h3 style={styles.cardTitle}>📊 Analysis Results</h3>
-            
-            {loading && (
-              <div style={styles.loading}>
-                <div style={styles.spinner}></div>
-                <p>Analyzing with AI...</p>
-              </div>
-            )}
+        {/* Main content */}
+        <main className="bg-white rounded-2xl p-6 sm:p-10 shadow-2xl">
 
-            {error && (
-              <div style={styles.error}>
-                <h4>⚠️ Analysis Error</h4>
-                <pre style={styles.errorText}>{error}</pre>
-              </div>
-            )}
+          {/* Diagnosis */}
+          {activeTab === 'diagnosis' && (
+            <div className={`grid ${isMobile ? 'grid-cols-1' : 'grid-cols-1 lg:grid-cols-2'} gap-8`}>
 
-            {result && (
-              <div style={styles.result}>
-                <div style={styles.resultHeader}>
-                  <span>✅ Analysis Complete</span>
-                  <div style={styles.resultMeta}>
-                    <span style={styles.model}>Model: {result.model}</span>
-                    <span style={styles.timestamp}>{result.timestamp}</span>
+              {/* Left column: image / camera */}
+              <div className="bg-gray-50 p-6 rounded-xl shadow-inner">
+                <h2 className="text-2xl font-bold text-center text-gray-800 mb-6">
+                  📸 Upload or Capture Image
+                </h2>
+
+                <div className="border-4 border-dashed border-indigo-200 bg-white rounded-xl p-4 text-center mb-6 min-h-[250px] flex items-center justify-center overflow-hidden">
+                  {isCameraActive ? (
+                    <div className="w-full">
+                      <video
+                        ref={videoRef}
+                        className="w-full h-auto max-h-[300px] rounded-lg object-cover"
+                        autoPlay
+                        playsInline
+                        muted
+                      />
+                      <canvas ref={canvasRef} className="hidden" />
+                    </div>
+                  ) : image ? (
+                    <div className="p-2">
+                      <img
+                        src={image}
+                        alt="Preview"
+                        className="max-w-full max-h-[250px] rounded-lg shadow-md"
+                      />
+                      <p className="mt-4 text-green-600 font-semibold">
+                        Image ready for analysis
+                      </p>
+                    </div>
+                  ) : (
+                    <div>
+                      <div className="text-6xl mb-4 text-indigo-400">🖼️</div>
+                      <p className="text-gray-500 font-medium">Upload image or use camera</p>
+                    </div>
+                  )}
+                </div>
+
+                {/* Buttons */}
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={handleFileSelect}
+                  ref={fileRef}
+                  className="hidden"
+                />
+
+                {isCameraActive ? (
+                  <div className="grid grid-cols-3 gap-3 mb-6">
+                    <button
+                      onClick={capturePhoto}
+                      className="py-3 bg-red-500 hover:bg-red-600 text-white font-semibold rounded-lg transition duration-200 shadow-md"
+                    >
+                      📸 Capture
+                    </button>
+                    <button
+                      onClick={switchCamera}
+                      className="py-3 bg-purple-500 hover:bg-purple-600 text-white font-semibold rounded-lg transition duration-200 shadow-md"
+                    >
+                      🔄 Flip
+                    </button>
+                    <button
+                      onClick={stopCamera}
+                      className="py-3 bg-gray-500 hover:bg-gray-600 text-white font-semibold rounded-lg transition duration-200 shadow-md"
+                    >
+                      ❌ Close
+                    </button>
                   </div>
-                </div>
-                <pre style={styles.resultText}>{result.text}</pre>
-                <div style={styles.disclaimer}>
-                  <strong>⚕️ Disclaimer:</strong> This analysis is for educational purposes only. Always consult healthcare professionals for medical diagnosis and treatment.
+                ) : (
+                  <div className="grid grid-cols-3 gap-3 mb-6">
+                    <button
+                      onClick={() => fileRef.current?.click()}
+                      className="py-3 bg-green-500 hover:bg-green-600 text-white font-semibold rounded-lg transition duration-200 shadow-md"
+                    >
+                      📁 Upload
+                    </button>
+                    <button
+                      onClick={() => startCamera('environment')}
+                      className="py-3 bg-blue-500 hover:bg-blue-600 text-white font-semibold rounded-lg transition duration-200 shadow-md"
+                    >
+                      📷 Camera
+                    </button>
+                    <button
+                      onClick={analyzeImage}
+                      disabled={!image || loading || !USER_API_KEY}
+                      className={`py-3 font-bold rounded-lg transition duration-200 shadow-xl ${
+                        loading || !image || !USER_API_KEY
+                          ? 'bg-gray-400 cursor-not-allowed'
+                          : 'bg-indigo-600 hover:bg-indigo-700 text-white'
+                      }`}
+                    >
+                      {loading ? '🔍 Analyzing...' : '🧠 Analyze'}
+                    </button>
+                  </div>
+                )}
+
+                {/* Tips */}
+                <div className="p-4 bg-yellow-50 border-l-4 border-yellow-500 rounded-md">
+                  <h4 className="text-base font-semibold text-yellow-800 mb-2">
+                    💡 Tips for Best Results:
+                  </h4>
+                  <ul className="text-sm text-yellow-700 list-disc list-inside space-y-1">
+                    <li>Use clear, focused images.</li>
+                    <li>Ensure good lighting (natural light is best).</li>
+                    <li>Only show the affected area clearly.</li>
+                  </ul>
                 </div>
               </div>
-            )}
-          </div>
-        )}
-      </main>
+
+              {/* Right column: results */}
+              <div className="bg-gray-100 p-6 rounded-xl shadow-lg">
+                <h2 className="text-2xl font-bold text-center text-gray-800 mb-6">
+                  📊 Analysis Results
+                </h2>
+
+                {loading && (
+                  <div className="text-center p-10">
+                    <svg
+                      className="animate-spin h-8 w-8 text-indigo-500 mx-auto mb-4"
+                      xmlns="http://www.w3.org/2000/svg"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                    >
+                      <circle
+                        className="opacity-25"
+                        cx="12"
+                        cy="12"
+                        r="10"
+                        stroke="currentColor"
+                        strokeWidth="4"
+                      />
+                      <path
+                        className="opacity-75"
+                        fill="currentColor"
+                        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                      />
+                    </svg>
+                    <h3 className="text-lg text-indigo-600">
+                      AI is analyzing the skin image...
+                    </h3>
+                  </div>
+                )}
+
+                {error && (
+                  <div className="bg-red-100 p-4 rounded-lg border-l-4 border-red-500 text-red-700">
+                    <h3 className="font-bold">Error:</h3>
+                    <p>{error}</p>
+                  </div>
+                )}
+
+                {result && (
+                  <div className="space-y-4">
+                    <div className="p-4 bg-indigo-50 rounded-lg border-2 border-indigo-300">
+                      <p className="text-xl font-bold text-indigo-700 mb-2">
+                        {result.diseaseName || 'Condition Unclear'}
+                      </p>
+                      <p className="text-sm text-indigo-500">
+                        Confidence:{' '}
+                        <span className="font-bold">
+                          {result.confidenceScore ?? 'N/A'}%
+                        </span>
+                      </p>
+                    </div>
+
+                    <div className="p-4 bg-white rounded-lg shadow-sm border border-gray-200">
+                      <h4 className="font-semibold text-gray-700 mb-2">
+                        Description:
+                      </h4>
+                      <p className="text-gray-600 whitespace-pre-wrap">
+                        {result.description}
+                      </p>
+                    </div>
+
+                    <div className="p-4 bg-yellow-100 rounded-lg border-l-4 border-yellow-500">
+                      <h4 className="font-bold text-yellow-800">⚠️ Disclaimer:</h4>
+                      <p className="text-sm text-yellow-700">
+                        {result.disclaimer ||
+                          'This is not medical advice. Always consult a licensed healthcare professional for diagnosis or treatment.'}
+                      </p>
+                    </div>
+
+                    <p className="text-xs text-gray-400 text-right pt-2">
+                      Last Updated: {result.timestamp}
+                    </p>
+                  </div>
+                )}
+
+                {!loading && !error && !result && !image && (
+                  <div className="text-center p-10 text-gray-400">
+                    <div className="text-6xl mb-4">✨</div>
+                    <p>Results will appear here after analysis.</p>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Chatbot */}
+          {activeTab === 'chatbot' && (
+            <div className="max-w-3xl mx-auto flex flex-col h-[500px] sm:h-[600px]">
+              <div className="text-center mb-6">
+                <div className="text-4xl mb-2">🤖</div>
+                <h2 className="text-2xl font-bold text-gray-800">
+                  AI Skin Health Assistant
+                </h2>
+                <p className="text-gray-500 text-sm">
+                  Ask me about skin conditions and general health tips.
+                </p>
+              </div>
+
+              <div
+                ref={chatRef}
+                className="flex-1 overflow-y-auto border-2 border-gray-200 rounded-xl p-4 sm:p-6 mb-4 bg-gray-50 shadow-inner space-y-4"
+              >
+                {chatHistory.map((msg, idx) => (
+                  <div
+                    key={idx}
+                    className={`flex ${
+                      msg.role === 'user' ? 'justify-end' : 'justify-start'
+                    }`}
+                  >
+                    <div
+                      className={`max-w-[80%] sm:max-w-[65%] p-3 rounded-xl shadow-md ${
+                        msg.role === 'user'
+                          ? 'bg-indigo-500 text-white rounded-br-none'
+                          : 'bg-gray-200 text-gray-800 rounded-tl-none'
+                      }`}
+                    >
+                      <p className="whitespace-pre-wrap">{msg.text}</p>
+                    </div>
+                  </div>
+                ))}
+
+                {isChatting && (
+                  <div className="flex justify-start">
+                    <div className="p-3 rounded-xl bg-gray-200 text-gray-800 rounded-tl-none shadow-md">
+                      <span className="animate-pulse">Typing...</span>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <div className="flex space-x-3">
+                <input
+                  type="text"
+                  value={userMessage}
+                  onChange={(e) => setUserMessage(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && sendMessage()}
+                  placeholder="Ask about skin conditions or treatments..."
+                  disabled={isChatting || !USER_API_KEY}
+                  className="flex-1 p-3 border-2 border-gray-300 rounded-full focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition"
+                />
+                <button
+                  onClick={sendMessage}
+                  disabled={isChatting || userMessage.trim() === '' || !USER_API_KEY}
+                  className={`w-12 h-12 rounded-full font-bold shadow-lg transition duration-200 flex items-center justify-center ${
+                    isChatting || userMessage.trim() === '' || !USER_API_KEY
+                      ? 'bg-gray-400 cursor-not-allowed'
+                      : 'bg-indigo-600 hover:bg-indigo-700 text-white transform hover:scale-105'
+                  }`}
+                >
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    className="h-5 w-5"
+                    viewBox="0 0 20 20"
+                    fill="currentColor"
+                  >
+                    <path d="M10.894 2.553a1 1 0 00-1.788 0l-7 14a1 1 0 00.149 1.442l.015.008.016.007.019.006.014.002h15.939a1 1 0 00.992-1.127l-7-14zM10 16a1 1 0 100-2 1 1 0 000 2z" />
+                  </svg>
+                </button>
+              </div>
+
+              <div className="mt-4 p-3 bg-indigo-50 rounded-xl border border-indigo-200">
+                <h4 className="text-sm font-semibold text-indigo-700 mb-2">
+                  💬 Quick Suggestions:
+                </h4>
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    onClick={() => setUserMessage('What causes acne?')}
+                    className="text-xs px-3 py-1 bg-white border border-indigo-300 rounded-full text-indigo-600 hover:bg-indigo-100 transition"
+                  >
+                    What causes acne?
+                  </button>
+                  <button
+                    onClick={() => setUserMessage('How to care for dry skin?')}
+                    className="text-xs px-3 py-1 bg-white border border-indigo-300 rounded-full text-indigo-600 hover:bg-indigo-100 transition"
+                  >
+                    How to care for dry skin?
+                  </button>
+                  <button
+                    onClick={() => setUserMessage('What is psoriasis?')}
+                    className="text-xs px-3 py-1 bg-white border border-indigo-300 rounded-full text-indigo-600 hover:bg-indigo-100 transition"
+                  >
+                    What is psoriasis?
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+        </main>
+
+        <footer className="text-center mt-8 text-white/80 text-sm">
+          <p>Made with ❤️ using Google Gemini AI</p>
+        </footer>
+      </div>
     </div>
   );
-}
-
-const styles = {
-  container: {
-    minHeight: '100vh',
-    backgroundColor: '#0a0b0d',
-    color: '#ffffff',
-    fontFamily: 'system-ui, -apple-system, sans-serif',
-  },
-  header: {
-    textAlign: 'center',
-    padding: '2rem 1rem',
-    background: 'linear-gradient(135deg, #1a1d23 0%, #2d3748 100%)',
-  },
-  title: {
-    fontSize: 'clamp(2rem, 5vw, 3.5rem)',
-    fontWeight: '900',
-    margin: '0 0 0.5rem 0',
-  },
-  titlePrimary: {
-    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-    WebkitBackgroundClip: 'text',
-    WebkitTextFillColor: 'transparent',
-  },
-  titleSecondary: {
-    background: 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)',
-    WebkitBackgroundClip: 'text',
-    WebkitTextFillColor: 'transparent',
-  },
-  subtitle: {
-    fontSize: '1.1rem',
-    opacity: 0.9,
-    margin: '0',
-    color: '#a0aec0',
-  },
-  testSection: {
-    textAlign: 'center',
-    padding: '1rem',
-    maxWidth: '800px',
-    margin: '0 auto',
-  },
-  testButton: {
-    padding: '0.75rem 1.5rem',
-    backgroundColor: '#667eea',
-    color: 'white',
-    border: 'none',
-    borderRadius: '0.5rem',
-    fontSize: '1rem',
-    fontWeight: '600',
-    cursor: 'pointer',
-    marginBottom: '1rem',
-  },
-  testResult: {
-    backgroundColor: 'rgba(255, 255, 255, 0.03)',
-    border: '1px solid rgba(255, 255, 255, 0.1)',
-    borderRadius: '0.5rem',
-    padding: '1rem',
-    textAlign: 'left',
-    fontSize: '0.9rem',
-    lineHeight: '1.4',
-  },
-  content: {
-    maxWidth: '800px',
-    margin: '0 auto',
-    padding: '1rem',
-  },
-  card: {
-    backgroundColor: 'rgba(255, 255, 255, 0.03)',
-    borderRadius: '1rem',
-    padding: '1.5rem',
-    border: '1px solid rgba(255, 255, 255, 0.1)',
-    backdropFilter: 'blur(10px)',
-    marginBottom: '1.5rem',
-  },
-  cardHeader: {
-    marginBottom: '1.5rem',
-  },
-  cardTitle: {
-    fontSize: '1.5rem',
-    fontWeight: '700',
-    margin: '0',
-    color: '#667eea',
-  },
-  imageContainer: {
-    border: '2px dashed #4a5568',
-    borderRadius: '1rem',
-    padding: '2rem',
-    textAlign: 'center',
-    minHeight: '250px',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: '1.5rem',
-  },
-  placeholder: {
-    color: '#718096',
-  },
-  placeholderIcon: {
-    fontSize: '3rem',
-    marginBottom: '1rem',
-  },
-  imagePreview: {
-    textAlign: 'center',
-  },
-  image: {
-    maxWidth: '100%',
-    maxHeight: '300px',
-    borderRadius: '0.5rem',
-    marginBottom: '1rem',
-  },
-  imageStatus: {
-    color: '#48bb78',
-    fontWeight: '600',
-  },
-  buttonContainer: {
-    display: 'flex',
-    gap: '1rem',
-    justifyContent: 'center',
-    flexWrap: 'wrap',
-  },
-  button: {
-    padding: '0.75rem 1.5rem',
-    backgroundColor: '#4a5568',
-    color: 'white',
-    border: 'none',
-    borderRadius: '0.5rem',
-    fontSize: '1rem',
-    fontWeight: '600',
-    cursor: 'pointer',
-    minWidth: '120px',
-  },
-  analyzeButton: {
-    background: 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)',
-    padding: '0.75rem 1.5rem',
-    color: 'white',
-    border: 'none',
-    borderRadius: '0.5rem',
-    fontSize: '1rem',
-    fontWeight: '700',
-    cursor: 'pointer',
-    minWidth: '120px',
-  },
-  loading: {
-    textAlign: 'center',
-    padding: '2rem',
-  },
-  spinner: {
-    width: '3rem',
-    height: '3rem',
-    border: '4px solid #2d3748',
-    borderTop: '4px solid #667eea',
-    borderRadius: '50%',
-    animation: 'spin 1s linear infinite',
-    margin: '0 auto 1rem',
-  },
-  error: {
-    backgroundColor: 'rgba(229, 62, 62, 0.1)',
-    border: '1px solid rgba(229, 62, 62, 0.3)',
-    borderRadius: '0.5rem',
-    padding: '1.5rem',
-    color: '#feb2b2',
-  },
-  errorText: {
-    whiteSpace: 'pre-wrap',
-    fontFamily: 'inherit',
-    fontSize: '0.9rem',
-    margin: '0.5rem 0',
-  },
-  result: {
-    backgroundColor: 'rgba(72, 187, 120, 0.1)',
-    border: '1px solid rgba(72, 187, 120, 0.3)',
-    borderRadius: '0.5rem',
-    padding: '1.5rem',
-  },
-  resultHeader: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: '1rem',
-    color: '#9ae6b4',
-    fontWeight: '600',
-  },
-  resultMeta: {
-    display: 'flex',
-    flexDirection: 'column',
-    alignItems: 'flex-end',
-    fontSize: '0.85rem',
-  },
-  model: {
-    opacity: 0.8,
-    marginBottom: '0.25rem',
-  },
-  timestamp: {
-    opacity: 0.7,
-  },
-  resultText: {
-    whiteSpace: 'pre-wrap',
-    fontFamily: 'inherit',
-    fontSize: '1rem',
-    lineHeight: '1.6',
-    margin: '0 0 1rem 0',
-    color: '#e2e8f0',
-  },
-  disclaimer: {
-    backgroundColor: 'rgba(237, 137, 54, 0.1)',
-    border: '1px solid rgba(237, 137, 54, 0.3)',
-    borderRadius: '0.5rem',
-    padding: '1rem',
-    fontSize: '0.875rem',
-    color: '#fbb74d',
-  },
 };
 
 export default App;
