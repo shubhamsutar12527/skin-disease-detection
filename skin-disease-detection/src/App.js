@@ -660,7 +660,7 @@ const App = () => {
         </main>
 
         <footer className="text-center mt-8 text-white/80 text-sm">
-          <p>Made with ❤️ using Google Gemini AI</p>
+          <p>Made with using Google API AI</p>
         </footer>
       </div>
     </div>
