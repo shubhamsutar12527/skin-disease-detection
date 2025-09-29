@@ -78,7 +78,7 @@ function App() {
     }
   };
 
-  // WORKING AI Analysis function - Uses the correct v1 API
+  // WORKING Analysis function - tries multiple model endpoints
   const analyzeImage = async () => {
     if (!image) {
       setError('Please select or capture an image first.');
@@ -89,22 +89,28 @@ function App() {
     setError('');
     setResult(null);
 
-    try {
-      const base64Image = image.split(',')[1];
-      
-      // Using the v1 API which should work with your key
-      const response = await fetch(
-        'https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=AIzaSyDHCEaLhGNsVgcbomKHetHRSC-y7nKIHXo',
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({
+    const base64Image = image.split(',')[1];
+    
+    // List of models to try in order (most compatible first)
+    const modelsToTry = [
+      'gemini-pro-vision',
+      'gemini-1.5-pro',
+      'gemini-pro',
+      'models/gemini-pro-vision'
+    ];
+
+    const apiVersions = ['v1beta', 'v1'];
+
+    for (const apiVersion of apiVersions) {
+      for (const model of modelsToTry) {
+        try {
+          console.log(`Trying ${apiVersion} with ${model}...`);
+          
+          const payload = {
             contents: [{
               parts: [
                 {
-                  text: "Analyze this skin image and provide a detailed assessment including possible conditions, confidence level, and recommendations. Always include a medical disclaimer."
+                  text: "Analyze this skin image and provide: 1) Possible skin condition 2) Confidence level 3) Description 4) Recommendations 5) Medical disclaimer"
                 },
                 {
                   inlineData: {
@@ -114,37 +120,79 @@ function App() {
                 }
               ]
             }]
+          };
+
+          const response = await fetch(
+            `https://generativelanguage.googleapis.com/${apiVersion}/models/${model}:generateContent?key=AIzaSyDHCEaLhGNsVgcbomKHetHRSC-y7nKIHXo`,
+            {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(payload)
+            }
+          );
+
+          if (response.ok) {
+            const data = await response.json();
+            const analysisText = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+            
+            if (analysisText) {
+              console.log(`✅ Success with ${apiVersion}/${model}`);
+              setResult({
+                text: analysisText,
+                timestamp: new Date().toLocaleString(),
+                model: `${apiVersion}/${model}`
+              });
+              setLoading(false);
+              return;
+            }
+          } else {
+            const errorData = await response.json();
+            console.log(`❌ Failed ${apiVersion}/${model}:`, errorData.error?.message);
+          }
+        } catch (err) {
+          console.log(`❌ Error with ${apiVersion}/${model}:`, err.message);
+        }
+      }
+    }
+
+    // If all models fail, try text-only analysis
+    try {
+      console.log('Trying text-only analysis...');
+      const response = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=AIzaSyDHCEaLhGNsVgcbomKHetHRSC-y7nKIHXo`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: [{
+              parts: [{
+                text: "I'm unable to analyze the uploaded image directly, but I can provide general information about skin health. For accurate skin condition assessment, please consult a dermatologist. Common skin conditions include acne, eczema, dermatitis, and various types of rashes. Proper diagnosis requires professional medical examination."
+              }]
+            }]
           })
         }
       );
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        console.error('API Error:', errorData);
-        throw new Error(`API Error ${response.status}: ${errorData.error?.message || 'Unknown error'}`);
-      }
-
-      const data = await response.json();
-      const analysisText = data?.candidates?.[0]?.content?.parts?.[0]?.text;
-      
-      if (analysisText) {
+      if (response.ok) {
+        const data = await response.json();
+        const analysisText = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+        
         setResult({
-          text: analysisText,
-          timestamp: new Date().toLocaleString()
+          text: `⚠️ Image analysis unavailable. Using text-only response:\n\n${analysisText}`,
+          timestamp: new Date().toLocaleString(),
+          model: 'text-only-fallback'
         });
       } else {
-        setError('No analysis result received. Please try again.');
+        throw new Error('All analysis methods failed');
       }
-
     } catch (err) {
-      console.error('Analysis error:', err);
-      setError(`Analysis failed: ${err.message}`);
+      setError('Analysis failed: Unable to access AI models. Please check your API key or try again later.');
     } finally {
       setLoading(false);
     }
   };
 
-  // Chat function using v1 API
+  // Chat function with fallback
   const sendMessage = async (e) => {
     e.preventDefault();
     if (!message.trim()) return;
@@ -156,28 +204,36 @@ function App() {
 
     try {
       const response = await fetch(
-        'https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=AIzaSyDHCEaLhGNsVgcbomKHetHRSC-y7nKIHXo',
+        'https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=AIzaSyDHCEaLhGNsVgcbomKHetHRSC-y7nKIHXo',
         {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json'
-          },
+          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             contents: [{
               parts: [{
-                text: `You are a helpful health assistant. Answer this question: "${userMessage}". Provide clear, accurate information and always remind users to consult healthcare professionals for serious concerns.`
+                text: `You are a helpful health assistant. Answer this question: "${userMessage}". Provide accurate information and always recommend consulting healthcare professionals for serious concerns.`
               }]
             }]
           })
         }
       );
 
-      const data = await response.json();
-      const botResponse = data?.candidates?.[0]?.content?.parts?.[0]?.text || 'Sorry, I could not process your request.';
-      
-      setChatHistory(prev => [...prev, { role: 'bot', text: botResponse }]);
+      if (response.ok) {
+        const data = await response.json();
+        const botResponse = data?.candidates?.[0]?.content?.parts?.[0]?.text || 'Sorry, I could not process your request.';
+        setChatHistory(prev => [...prev, { role: 'bot', text: botResponse }]);
+      } else {
+        const errorData = await response.json();
+        setChatHistory(prev => [...prev, { 
+          role: 'bot', 
+          text: `Sorry, I'm having technical difficulties: ${errorData.error?.message || 'API Error'}. Please try again later.` 
+        }]);
+      }
     } catch (err) {
-      setChatHistory(prev => [...prev, { role: 'bot', text: 'Sorry, there was an error processing your message.' }]);
+      setChatHistory(prev => [...prev, { 
+        role: 'bot', 
+        text: 'Sorry, there was a connection error. Please try again later.' 
+      }]);
     } finally {
       setChatLoading(false);
     }
@@ -311,13 +367,20 @@ function App() {
                 {loading && (
                   <div style={styles.loading}>
                     <div style={styles.spinner}></div>
-                    <p>Analyzing with AI...</p>
+                    <p>Trying multiple AI models...</p>
+                    <small>This may take a moment</small>
                   </div>
                 )}
 
                 {error && (
                   <div style={styles.error}>
                     <p>⚠️ {error}</p>
+                    <p><strong>💡 Troubleshooting:</strong></p>
+                    <ul>
+                      <li>Check your API key has proper permissions</li>
+                      <li>Verify your account has access to vision models</li>
+                      <li>Try again in a few minutes</li>
+                    </ul>
                   </div>
                 )}
 
@@ -325,7 +388,10 @@ function App() {
                   <div style={styles.result}>
                     <div style={styles.resultHeader}>
                       <span>✅ Analysis Complete</span>
-                      <span style={styles.timestamp}>{result.timestamp}</span>
+                      <div>
+                        <span style={styles.model}>Model: {result.model}</span>
+                        <span style={styles.timestamp}>{result.timestamp}</span>
+                      </div>
                     </div>
                     <pre style={styles.resultText}>{result.text}</pre>
                     <div style={styles.disclaimer}>
@@ -382,7 +448,7 @@ function App() {
               <p><strong>Arogya Mantra</strong> is an AI-powered skin health analysis tool.</p>
               <p><strong>Features:</strong></p>
               <ul>
-                <li>AI image analysis</li>
+                <li>AI image analysis (when available)</li>
                 <li>Health assistant chat</li>
                 <li>Camera integration</li>
                 <li>Privacy-focused processing</li>
@@ -590,6 +656,11 @@ const styles = {
     marginBottom: '1rem',
     color: '#9ae6b4',
     fontWeight: '600',
+  },
+  model: {
+    fontSize: '0.75rem',
+    opacity: 0.7,
+    marginRight: '1rem',
   },
   timestamp: {
     fontSize: '0.875rem',
