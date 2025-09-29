@@ -80,7 +80,7 @@ function App() {
     }
   };
 
-  // AI Analysis function with your NEW API key
+  // AI Analysis function - CORRECTED MODEL NAME
   const analyzeImage = async () => {
     if (!image) {
       setError('Please select or capture an image first.');
@@ -102,8 +102,9 @@ function App() {
         }]
       };
 
+      // FIXED: Using correct model name 'gemini-1.5-flash' (without -latest)
       const response = await fetch(
-        'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=AIzaSyAndhAs2KngwAb1-Obid8R5FgXKF1gpfns',
+        'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=AIzaSyAndhAs2KngwAb1-Obid8R5FgXKF1gpfns',
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -140,7 +141,7 @@ function App() {
     }
   };
 
-  // Chat function with your NEW API key
+  // Chat function - CORRECTED MODEL NAME
   const sendMessage = async (e) => {
     e.preventDefault();
     if (!message.trim()) return;
@@ -157,8 +158,9 @@ function App() {
         }]
       };
 
+      // FIXED: Using correct model name 'gemini-1.5-flash' (without -latest)
       const response = await fetch(
-        'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=AIzaSyAndhAs2KngwAb1-Obid8R5FgXKF1gpfns',
+        'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=AIzaSyAndhAs2KngwAb1-Obid8R5FgXKF1gpfns',
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -362,7 +364,7 @@ function App() {
   );
 }
 
-// Styles object
+// Styles object (same as before)
 const styles = {
   container: {
     minHeight: '100vh',
