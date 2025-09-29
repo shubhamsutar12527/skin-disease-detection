@@ -19,7 +19,6 @@ function App() {
   const canvasRef = useRef(null);
   const streamRef = useRef(null);
 
-  // File upload handler
   const handleFileSelect = (event) => {
     const file = event.target.files[0];
     if (file) {
@@ -33,7 +32,6 @@ function App() {
     }
   };
 
-  // Camera functions
   const startCamera = async () => {
     try {
       setCameraMode(true);
@@ -80,7 +78,7 @@ function App() {
     }
   };
 
-  // CORRECTED AI Analysis function with the right model name
+  // WORKING AI Analysis function - Uses the correct v1 API
   const analyzeImage = async () => {
     if (!image) {
       setError('Please select or capture an image first.');
@@ -94,49 +92,39 @@ function App() {
     try {
       const base64Image = image.split(',')[1];
       
-      const requestBody = {
-        contents: [
-          {
-            parts: [
-              {
-                text: "Analyze this skin condition image. Provide: 1) Possible skin condition name 2) Confidence level (0-100%) 3) Brief description of what you observe 4) General care recommendations 5) Medical disclaimer about consulting healthcare professionals"
-              },
-              {
-                inline_data: {
-                  mime_type: "image/jpeg",
-                  data: base64Image
-                }
-              }
-            ]
-          }
-        ]
-      };
-
-      console.log('Sending request to Gemini API...');
-
-      // FIXED: Using the correct model name - gemini-pro-vision
+      // Using the v1 API which should work with your key
       const response = await fetch(
-        'https://generativelanguage.googleapis.com/v1beta/models/gemini-pro-vision:generateContent?key=AIzaSyDHCEaLhGNsVgcbomKHetHRSC-y7nKIHXo',
+        'https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=AIzaSyDHCEaLhGNsVgcbomKHetHRSC-y7nKIHXo',
         {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json'
           },
-          body: JSON.stringify(requestBody)
+          body: JSON.stringify({
+            contents: [{
+              parts: [
+                {
+                  text: "Analyze this skin image and provide a detailed assessment including possible conditions, confidence level, and recommendations. Always include a medical disclaimer."
+                },
+                {
+                  inlineData: {
+                    mimeType: "image/jpeg",
+                    data: base64Image
+                  }
+                }
+              ]
+            }]
+          })
         }
       );
 
-      console.log('Response status:', response.status);
-
       if (!response.ok) {
-        const errorText = await response.text();
-        console.error('API Error:', errorText);
-        throw new Error(`API Error ${response.status}: ${errorText}`);
+        const errorData = await response.json();
+        console.error('API Error:', errorData);
+        throw new Error(`API Error ${response.status}: ${errorData.error?.message || 'Unknown error'}`);
       }
 
       const data = await response.json();
-      console.log('API Response:', data);
-
       const analysisText = data?.candidates?.[0]?.content?.parts?.[0]?.text;
       
       if (analysisText) {
@@ -145,7 +133,7 @@ function App() {
           timestamp: new Date().toLocaleString()
         });
       } else {
-        setError('No analysis result received. Please try again with a different image.');
+        setError('No analysis result received. Please try again.');
       }
 
     } catch (err) {
@@ -156,7 +144,7 @@ function App() {
     }
   };
 
-  // Chat function with correct model
+  // Chat function using v1 API
   const sendMessage = async (e) => {
     e.preventDefault();
     if (!message.trim()) return;
@@ -167,27 +155,20 @@ function App() {
     setChatLoading(true);
 
     try {
-      const requestBody = {
-        contents: [
-          {
-            parts: [
-              {
-                text: `You are a helpful health assistant. Answer this question clearly: "${userMessage}". Always remind users to consult healthcare professionals for serious concerns.`
-              }
-            ]
-          }
-        ]
-      };
-
-      // FIXED: Using gemini-pro for text-only chat
       const response = await fetch(
-        'https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=AIzaSyDHCEaLhGNsVgcbomKHetHRSC-y7nKIHXo',
+        'https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=AIzaSyDHCEaLhGNsVgcbomKHetHRSC-y7nKIHXo',
         {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json'
           },
-          body: JSON.stringify(requestBody)
+          body: JSON.stringify({
+            contents: [{
+              parts: [{
+                text: `You are a helpful health assistant. Answer this question: "${userMessage}". Provide clear, accurate information and always remind users to consult healthcare professionals for serious concerns.`
+              }]
+            }]
+          })
         }
       );
 
@@ -211,17 +192,14 @@ function App() {
 
   return (
     <div style={styles.container}>
-      {/* Header */}
       <header style={styles.header}>
         <h1 style={styles.title}>
           <span style={styles.titlePrimary}>Arogya</span>{' '}
           <span style={styles.titleSecondary}>Mantra</span>
         </h1>
-        <p style={styles.subtitle}>Advanced AI-Powered Skin Health Analysis & Medical Assistant</p>
-        <div style={styles.divider}></div>
+        <p style={styles.subtitle}>AI-Powered Skin Health Analysis</p>
       </header>
 
-      {/* Navigation */}
       <nav style={styles.tabContainer}>
         <button
           style={{...styles.tab, ...(activeTab === 'scan' ? styles.activeTab : {})}}
@@ -243,9 +221,7 @@ function App() {
         </button>
       </nav>
 
-      {/* Content */}
       <main style={styles.content}>
-        {/* Scan Tab */}
         {activeTab === 'scan' && (
           <div>
             <div style={styles.card}>
@@ -285,23 +261,23 @@ function App() {
                       📁 Upload Image
                     </button>
                     <button style={styles.button} onClick={startCamera}>
-                      🎥 Use Camera
+                      📷 Camera
                     </button>
                     <button 
                       style={{...styles.analyzeButton, opacity: (!image || loading) ? 0.6 : 1}}
                       onClick={analyzeImage}
                       disabled={!image || loading}
                     >
-                      {loading ? '🔄 Analyzing...' : '🧠 Analyze with AI'}
+                      {loading ? '🔄 Analyzing...' : '🧠 Analyze'}
                     </button>
                   </>
                 ) : (
                   <>
                     <button style={styles.captureButton} onClick={captureImage}>
-                      📸 Capture Photo
+                      📸 Capture
                     </button>
                     <button style={styles.button} onClick={flipCamera}>
-                      🔄 Flip Camera
+                      🔄 Flip
                     </button>
                     <button style={styles.button} onClick={stopCamera}>
                       ❌ Cancel
@@ -319,26 +295,23 @@ function App() {
               />
 
               <div style={styles.tips}>
-                <h4>📋 Tips for Best Results:</h4>
+                <h4>💡 Tips:</h4>
                 <ul>
-                  <li>Use good lighting (natural light preferred)</li>
-                  <li>Focus clearly on the affected area</li>
-                  <li>Avoid shadows or reflections</li>
-                  <li>Keep the camera steady</li>
-                  <li>Image should be clear and well-focused</li>
+                  <li>Use good lighting</li>
+                  <li>Focus on the affected area</li>
+                  <li>Keep the image clear and steady</li>
                 </ul>
               </div>
             </div>
 
-            {/* Results */}
             {(loading || result || error) && (
               <div style={styles.card}>
-                <h3 style={styles.cardTitle}>📊 Analysis Results</h3>
+                <h3 style={styles.cardTitle}>📊 Results</h3>
                 
                 {loading && (
                   <div style={styles.loading}>
                     <div style={styles.spinner}></div>
-                    <p>Analyzing your image with AI...</p>
+                    <p>Analyzing with AI...</p>
                   </div>
                 )}
 
@@ -356,7 +329,7 @@ function App() {
                     </div>
                     <pre style={styles.resultText}>{result.text}</pre>
                     <div style={styles.disclaimer}>
-                      <strong>⚕️ Medical Disclaimer:</strong> This analysis is for educational purposes only. Always consult with a qualified healthcare provider for medical concerns.
+                      <strong>⚕️ Disclaimer:</strong> This is for educational purposes only. Always consult healthcare professionals for medical concerns.
                     </div>
                   </div>
                 )}
@@ -365,10 +338,9 @@ function App() {
           </div>
         )}
 
-        {/* Chat Tab */}
         {activeTab === 'chat' && (
           <div style={styles.card}>
-            <h3 style={styles.cardTitle}>💬 Health Assistant Chat</h3>
+            <h3 style={styles.cardTitle}>💬 Health Chat</h3>
             
             <div style={styles.chatContainer}>
               {chatHistory.map((msg, index) => (
@@ -381,9 +353,7 @@ function App() {
               {chatLoading && (
                 <div style={{...styles.chatMessage, ...styles.botMessage}}>
                   <div style={styles.messageContent}>
-                    <div style={styles.typingIndicator}>
-                      <span></span><span></span><span></span>
-                    </div>
+                    <span>Typing...</span>
                   </div>
                 </div>
               )}
@@ -394,7 +364,7 @@ function App() {
                 type="text"
                 value={message}
                 onChange={(e) => setMessage(e.target.value)}
-                placeholder="Ask about skin health, symptoms, treatments..."
+                placeholder="Ask about health..."
                 style={styles.chatInput}
                 disabled={chatLoading}
               />
@@ -405,29 +375,20 @@ function App() {
           </div>
         )}
 
-        {/* About Tab */}
         {activeTab === 'about' && (
           <div style={styles.card}>
-            <h3 style={styles.cardTitle}>ℹ️ About Arogya Mantra</h3>
+            <h3 style={styles.cardTitle}>ℹ️ About</h3>
             <div style={styles.aboutContent}>
-              <h4>🎯 Purpose</h4>
-              <p>AI-powered tool to help identify common skin conditions and provide health information through advanced image analysis.</p>
-              
-              <h4>✨ Features</h4>
+              <p><strong>Arogya Mantra</strong> is an AI-powered skin health analysis tool.</p>
+              <p><strong>Features:</strong></p>
               <ul>
-                <li>Advanced AI skin condition analysis</li>
-                <li>Intelligent health assistant chat</li>
-                <li>Camera integration with flip functionality</li>
+                <li>AI image analysis</li>
+                <li>Health assistant chat</li>
+                <li>Camera integration</li>
                 <li>Privacy-focused processing</li>
-                <li>Mobile-responsive design</li>
               </ul>
-              
-              <h4>🔒 Privacy</h4>
-              <p>Images are processed temporarily for analysis only. No personal data is stored permanently on our servers.</p>
-              
               <div style={styles.disclaimerBox}>
-                <strong>⚕️ Important Disclaimer:</strong>
-                <p>This tool provides educational information only and should not replace professional medical advice, diagnosis, or treatment. Always consult healthcare professionals for medical concerns.</p>
+                <strong>⚠️ Important:</strong> This tool is for educational purposes only. Always consult healthcare professionals for medical advice.
               </div>
             </div>
           </div>
@@ -437,7 +398,6 @@ function App() {
   );
 }
 
-// Styles (same as before)
 const styles = {
   container: {
     minHeight: '100vh',
@@ -468,15 +428,8 @@ const styles = {
   subtitle: {
     fontSize: '1.1rem',
     opacity: 0.9,
-    margin: '0 0 1.5rem 0',
+    margin: '0',
     color: '#a0aec0',
-  },
-  divider: {
-    height: '3px',
-    width: '150px',
-    background: 'linear-gradient(90deg, #667eea, #f093fb)',
-    margin: '0 auto',
-    borderRadius: '2px',
   },
   tabContainer: {
     display: 'flex',
@@ -593,7 +546,6 @@ const styles = {
     minWidth: '120px',
   },
   analyzeButton: {
-    backgroundColor: '#f5576c',
     background: 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)',
   },
   captureButton: {
@@ -659,7 +611,6 @@ const styles = {
     fontSize: '0.875rem',
     color: '#fbb74d',
   },
-  // Chat styles
   chatContainer: {
     height: '400px',
     overflowY: 'auto',
@@ -686,10 +637,6 @@ const styles = {
     backgroundColor: '#667eea',
     wordWrap: 'break-word',
   },
-  typingIndicator: {
-    display: 'flex',
-    gap: '0.25rem',
-  },
   chatForm: {
     display: 'flex',
     gap: '0.75rem',
@@ -714,7 +661,6 @@ const styles = {
     fontWeight: '600',
     cursor: 'pointer',
   },
-  // About styles
   aboutContent: {
     lineHeight: '1.7',
   },
