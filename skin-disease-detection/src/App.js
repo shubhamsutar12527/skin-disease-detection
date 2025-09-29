@@ -1,10 +1,5 @@
 import React, { useState, useRef } from 'react';
 
-// API Configuration with your new details
-const GEMINI_API_KEY = 'AIzaSyClr14CAWBVITR6oi24fKkHxkPBAuc5pEI';
-const PROJECT_NAME = 'projects/798774183029';
-const PROJECT_NUMBER = '798774183029';
-
 function App() {
   const [activeTab, setActiveTab] = useState('scan');
   const [image, setImage] = useState(null);
@@ -84,7 +79,6 @@ function App() {
     }
   };
 
-  // Enhanced analysis function with multiple API attempts
   const analyzeDescription = async () => {
     if (!description.trim()) {
       setError('Please describe your skin condition to get an analysis.');
@@ -95,92 +89,60 @@ function App() {
     setError('');
     setResult(null);
 
-    // Try multiple API endpoints and models
-    const apiConfigs = [
-      // Try v1beta with gemini-pro first
-      {
-        url: `https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${GEMINI_API_KEY}`,
-        model: 'gemini-pro (v1beta)'
-      },
-      // Try v1 with gemini-pro
-      {
-        url: `https://generativelanguage.googleapis.com/v1/models/gemini-pro:generateContent?key=${GEMINI_API_KEY}`,
-        model: 'gemini-pro (v1)'
-      },
-      // Try with project-specific path
-      {
-        url: `https://generativelanguage.googleapis.com/v1beta/${PROJECT_NAME}/models/gemini-pro:generateContent?key=${GEMINI_API_KEY}`,
-        model: 'gemini-pro (project-specific)'
-      }
-    ];
-
-    for (const config of apiConfigs) {
-      try {
-        console.log(`Trying: ${config.model}...`);
-        
-        const response = await fetch(config.url, {
+    try {
+      const response = await fetch(
+        'https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=AIzaSyClr14CAWBVITR6oi24fKkHxkPBAuc5pEI',
+        {
           method: 'POST',
           headers: { 
-            'Content-Type': 'application/json',
-            'x-goog-user-project': PROJECT_NUMBER
+            'Content-Type': 'application/json'
           },
           body: JSON.stringify({
             contents: [{
               parts: [{
                 text: `You are a knowledgeable health assistant. Based on this skin condition description: "${description.trim()}", provide:
 
-1. **Possible Conditions**: List 2-3 most likely skin conditions that match this description
-2. **Confidence Assessment**: Rate your confidence level (Low/Medium/High) and explain why
-3. **Key Symptoms**: Identify the main symptoms mentioned
-4. **General Care Recommendations**: 
+1. **Possible Conditions**: List 2-3 most likely skin conditions
+2. **Confidence Level**: Your assessment confidence (Low/Medium/High)
+3. **Key Symptoms**: Main symptoms identified
+4. **Care Recommendations**: 
    - Immediate care steps
    - When to see a healthcare provider
    - Prevention tips
-5. **Important Disclaimer**: Emphasize this is educational information only
+5. **Medical Disclaimer**: This is educational information only
 
-Please provide detailed, helpful information while being clear about the limitations of text-based assessment.`
+Provide detailed, helpful information while being clear about limitations.`
               }]
             }]
           })
-        });
-
-        console.log(`Response status: ${response.status}`);
-
-        if (response.ok) {
-          const data = await response.json();
-          const analysisText = data?.candidates?.[0]?.content?.parts?.[0]?.text;
-          
-          if (analysisText) {
-            console.log(`✅ Success with ${config.model}`);
-            setResult({
-              text: analysisText,
-              timestamp: new Date().toLocaleString(),
-              input: description.trim(),
-              model: config.model
-            });
-            setLoading(false);
-            return;
-          }
-        } else {
-          const errorData = await response.json();
-          console.log(`❌ Failed ${config.model}:`, errorData.error?.message || 'Unknown error');
         }
-      } catch (err) {
-        console.log(`❌ Error with ${config.model}:`, err.message);
+      );
+
+      if (response.ok) {
+        const data = await response.json();
+        const analysisText = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+        
+        if (analysisText) {
+          setResult({
+            text: analysisText,
+            timestamp: new Date().toLocaleString(),
+            input: description.trim()
+          });
+        } else {
+          setError('No analysis result received. Please try again.');
+        }
+      } else {
+        const errorData = await response.json();
+        throw new Error(`API Error: ${errorData.error?.message || 'Unknown error'}`);
       }
+    } catch (err) {
+      console.error('Analysis error:', err);
+      setError(`Analysis failed: ${err.message}`);
+    } finally {
+      setLoading(false);
     }
-
-    // If all attempts fail
-    setError(`Analysis failed: Unable to connect to AI service. Please check your internet connection and try again. 
-
-**Troubleshooting:**
-- Verify your API key is active
-- Check if the service is available in your region
-- Try again in a few minutes`);
-    setLoading(false);
   };
 
-  // Enhanced chat function with multiple endpoints
   const sendMessage = async (e) => {
     e.preventDefault();
     if (!message.trim()) return;
@@ -190,60 +152,37 @@ Please provide detailed, helpful information while being clear about the limitat
     setChatHistory(prev => [...prev, { role: 'user', text: userMessage }]);
     setChatLoading(true);
 
-    const apiConfigs = [
-      {
-        url: `https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${GEMINI_API_KEY}`,
-        model: 'gemini-pro (v1beta)'
-      },
-      {
-        url: `https://generativelanguage.googleapis.com/v1/models/gemini-pro:generateContent?key=${GEMINI_API_KEY}`,
-        model: 'gemini-pro (v1)'
-      }
-    ];
-
-    for (const config of apiConfigs) {
-      try {
-        const response = await fetch(config.url, {
+    try {
+      const response = await fetch(
+        'https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=AIzaSyClr14CAWBVITR6oi24fKkHxkPBAuc5pEI',
+        {
           method: 'POST',
-          headers: { 
-            'Content-Type': 'application/json',
-            'x-goog-user-project': PROJECT_NUMBER
-          },
+          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             contents: [{
               parts: [{
-                text: `You are a helpful health assistant. Answer this health question clearly and accurately: "${userMessage}". 
-
-Provide practical, evidence-based information. If it's about a specific condition, include:
-- Brief explanation
-- Common symptoms
-- General management tips
-- When to seek medical care
-
-Always remind users to consult healthcare professionals for diagnosis and treatment. Keep responses conversational but professional.`
+                text: `You are a helpful health assistant. Answer this health question clearly: "${userMessage}". Provide practical, evidence-based information. Always remind users to consult healthcare professionals for serious concerns.`
               }]
             }]
           })
-        });
-
-        if (response.ok) {
-          const data = await response.json();
-          const botResponse = data?.candidates?.[0]?.content?.parts?.[0]?.text || 'Sorry, I could not process your request.';
-          setChatHistory(prev => [...prev, { role: 'bot', text: botResponse }]);
-          setChatLoading(false);
-          return;
         }
-      } catch (err) {
-        console.log(`Chat error with ${config.model}:`, err.message);
-      }
-    }
+      );
 
-    // If all attempts fail
-    setChatHistory(prev => [...prev, { 
-      role: 'bot', 
-      text: 'Sorry, I\'m having technical difficulties connecting to the AI service. Please try again in a moment.' 
-    }]);
-    setChatLoading(false);
+      if (response.ok) {
+        const data = await response.json();
+        const botResponse = data?.candidates?.[0]?.content?.parts?.[0]?.text || 'Sorry, I could not process your request.';
+        setChatHistory(prev => [...prev, { role: 'bot', text: botResponse }]);
+      } else {
+        throw new Error('Chat service temporarily unavailable');
+      }
+    } catch (err) {
+      setChatHistory(prev => [...prev, { 
+        role: 'bot', 
+        text: 'Sorry, I am having technical difficulties. Please try again in a moment.' 
+      }]);
+    } finally {
+      setChatLoading(false);
+    }
   };
 
   const clearData = () => {
@@ -262,26 +201,23 @@ Always remind users to consult healthcare professionals for diagnosis and treatm
           <span style={styles.titleSecondary}>Mantra</span>
         </h1>
         <p style={styles.subtitle}>AI-Powered Health Analysis & Assistant</p>
-        <div style={styles.apiInfo}>
-          <small>Powered by Google Gemini AI • Project: {PROJECT_NUMBER}</small>
-        </div>
       </header>
 
       <nav style={styles.tabContainer}>
         <button
-          style={{...styles.tab, ...(activeTab === 'scan' ? styles.activeTab : {})}}
+          style={activeTab === 'scan' ? {...styles.tab, ...styles.activeTab} : styles.tab}
           onClick={() => setActiveTab('scan')}
         >
           🔬 Skin Analysis
         </button>
         <button
-          style={{...styles.tab, ...(activeTab === 'chat' ? styles.activeTab : {})}}
+          style={activeTab === 'chat' ? {...styles.tab, ...styles.activeTab} : styles.tab}
           onClick={() => setActiveTab('chat')}
         >
           🤖 Health Assistant
         </button>
         <button
-          style={{...styles.tab, ...(activeTab === 'about' ? styles.activeTab : {})}}
+          style={activeTab === 'about' ? {...styles.tab, ...styles.activeTab} : styles.tab}
           onClick={() => setActiveTab('about')}
         >
           ℹ️ About
@@ -301,7 +237,6 @@ Always remind users to consult healthcare professionals for diagnosis and treatm
                 )}
               </div>
               
-              {/* Image Upload Section */}
               <div style={styles.imageContainer}>
                 {cameraMode ? (
                   <div style={styles.cameraContainer}>
@@ -324,16 +259,16 @@ Always remind users to consult healthcare professionals for diagnosis and treatm
 
               <div style={styles.buttonContainer}>
                 {!cameraMode ? (
-                  <>
+                  <React.Fragment>
                     <button style={styles.button} onClick={() => fileInputRef.current?.click()}>
                       📁 Upload Image
                     </button>
                     <button style={styles.button} onClick={startCamera}>
                       📷 Camera
                     </button>
-                  </>
+                  </React.Fragment>
                 ) : (
-                  <>
+                  <React.Fragment>
                     <button style={styles.captureButton} onClick={captureImage}>
                       📸 Capture
                     </button>
@@ -343,7 +278,7 @@ Always remind users to consult healthcare professionals for diagnosis and treatm
                     <button style={styles.button} onClick={stopCamera}>
                       ❌ Cancel
                     </button>
-                  </>
+                  </React.Fragment>
                 )}
               </div>
 
@@ -355,18 +290,20 @@ Always remind users to consult healthcare professionals for diagnosis and treatm
                 style={{ display: 'none' }}
               />
 
-              {/* Description Section */}
               <div style={styles.descriptionSection}>
                 <h4 style={styles.sectionTitle}>📝 Describe Your Skin Condition</h4>
                 <textarea
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
-                  placeholder="Describe your skin condition in detail:&#10;&#10;• What does it look like? (color, size, texture)&#10;• Where is it located?&#10;• When did it start?&#10;• Any symptoms? (itching, pain, burning)&#10;• What makes it better or worse?&#10;• Any recent changes?&#10;&#10;Example: 'Red, itchy patches on my arms that appeared 3 days ago. They're about 2cm wide, slightly raised, and get worse when I scratch them.'"
+                  placeholder="Describe your skin condition in detail:&#10;&#10;• What does it look like? (color, size, texture)&#10;• Where is it located?&#10;• When did it start?&#10;• Any symptoms? (itching, pain, burning)&#10;• What makes it better or worse?&#10;&#10;Example: 'Red, itchy patches on my arms that appeared 3 days ago. They are about 2cm wide, slightly raised, and get worse when I scratch them.'"
                   style={styles.textarea}
                   rows={6}
                 />
                 <button 
-                  style={{...styles.analyzeButton, opacity: (!description.trim() || loading) ? 0.6 : 1}}
+                  style={(!description.trim() || loading) ? 
+                    {...styles.analyzeButton, opacity: 0.6} : 
+                    styles.analyzeButton
+                  }
                   onClick={analyzeDescription}
                   disabled={!description.trim() || loading}
                 >
@@ -378,7 +315,7 @@ Always remind users to consult healthcare professionals for diagnosis and treatm
                 <h4>💡 Tips for Better Analysis:</h4>
                 <ul>
                   <li><strong>Be specific:</strong> Include color, size, texture, location</li>
-                  <li><strong>Mention timing:</strong> When it started, how it's changed</li>
+                  <li><strong>Mention timing:</strong> When it started, how it has changed</li>
                   <li><strong>Include symptoms:</strong> Pain, itching, burning, etc.</li>
                   <li><strong>Note triggers:</strong> What makes it better or worse</li>
                 </ul>
@@ -393,7 +330,6 @@ Always remind users to consult healthcare professionals for diagnosis and treatm
                   <div style={styles.loading}>
                     <div style={styles.spinner}></div>
                     <p>Analyzing your description with AI...</p>
-                    <small>Trying multiple AI endpoints for best results...</small>
                   </div>
                 )}
 
@@ -407,17 +343,14 @@ Always remind users to consult healthcare professionals for diagnosis and treatm
                   <div style={styles.result}>
                     <div style={styles.resultHeader}>
                       <span>✅ Analysis Complete</span>
-                      <div style={styles.resultMeta}>
-                        <span style={styles.model}>Model: {result.model}</span>
-                        <span style={styles.timestamp}>{result.timestamp}</span>
-                      </div>
+                      <span style={styles.timestamp}>{result.timestamp}</span>
                     </div>
                     <div style={styles.inputSummary}>
                       <strong>Your Description:</strong> "{result.input}"
                     </div>
                     <pre style={styles.resultText}>{result.text}</pre>
                     <div style={styles.disclaimer}>
-                      <strong>⚕️ Important Disclaimer:</strong> This analysis is based on your description only and is for educational purposes. For accurate diagnosis and treatment, please consult a qualified healthcare professional or dermatologist.
+                      <strong>⚕️ Important Disclaimer:</strong> This analysis is based on your description only and is for educational purposes. For accurate diagnosis and treatment, please consult a qualified healthcare professional.
                     </div>
                   </div>
                 )}
@@ -432,7 +365,10 @@ Always remind users to consult healthcare professionals for diagnosis and treatm
             
             <div style={styles.chatContainer}>
               {chatHistory.map((msg, index) => (
-                <div key={index} style={{...styles.chatMessage, ...(msg.role === 'user' ? styles.userMessage : styles.botMessage)}}>
+                <div key={index} style={msg.role === 'user' ? 
+                  {...styles.chatMessage, ...styles.userMessage} : 
+                  {...styles.chatMessage, ...styles.botMessage}
+                }>
                   <div style={styles.messageContent}>
                     {msg.text}
                   </div>
@@ -456,7 +392,11 @@ Always remind users to consult healthcare professionals for diagnosis and treatm
                 style={styles.chatInput}
                 disabled={chatLoading}
               />
-              <button type="submit" style={styles.chatButton} disabled={chatLoading || !message.trim()}>
+              <button 
+                type="submit" 
+                style={styles.chatButton} 
+                disabled={chatLoading || !message.trim()}
+              >
                 {chatLoading ? '⏳' : '🚀'} Send
               </button>
             </form>
@@ -478,14 +418,6 @@ Always remind users to consult healthcare professionals for diagnosis and treatm
                 <li><strong>Privacy Focused:</strong> No data stored, secure processing</li>
               </ul>
 
-              <h4>🔧 Technical Details:</h4>
-              <ul>
-                <li><strong>AI Model:</strong> Google Gemini Pro</li>
-                <li><strong>API Key:</strong> {GEMINI_API_KEY.substring(0, 20)}...</li>
-                <li><strong>Project:</strong> {PROJECT_NUMBER}</li>
-                <li><strong>Multiple Endpoints:</strong> Automatic fallback for reliability</li>
-              </ul>
-
               <h4>🎯 How It Works:</h4>
               <ol>
                 <li>Upload an image (optional) or describe your skin condition in detail</li>
@@ -496,13 +428,7 @@ Always remind users to consult healthcare professionals for diagnosis and treatm
               
               <div style={styles.disclaimerBox}>
                 <strong>⚠️ Important Medical Disclaimer:</strong>
-                <p>This tool provides educational information only based on your descriptions. It cannot replace professional medical examination, diagnosis, or treatment. Always consult qualified healthcare professionals for:</p>
-                <ul>
-                  <li>Accurate diagnosis of skin conditions</li>
-                  <li>Treatment recommendations</li>
-                  <li>Persistent or worsening symptoms</li>
-                  <li>Any serious health concerns</li>
-                </ul>
+                <p>This tool provides educational information only based on your descriptions. It cannot replace professional medical examination, diagnosis, or treatment. Always consult qualified healthcare professionals for accurate diagnosis and treatment.</p>
               </div>
             </div>
           </div>
@@ -542,13 +468,8 @@ const styles = {
   subtitle: {
     fontSize: '1.1rem',
     opacity: 0.9,
-    margin: '0 0 0.5rem 0',
+    margin: '0',
     color: '#a0aec0',
-  },
-  apiInfo: {
-    opacity: 0.6,
-    fontSize: '0.85rem',
-    color: '#718096',
   },
   tabContainer: {
     display: 'flex',
@@ -665,7 +586,15 @@ const styles = {
     minWidth: '120px',
   },
   captureButton: {
+    padding: '0.75rem 1.5rem',
     backgroundColor: '#e53e3e',
+    color: 'white',
+    border: 'none',
+    borderRadius: '0.5rem',
+    fontSize: '1rem',
+    fontWeight: '600',
+    cursor: 'pointer',
+    minWidth: '120px',
   },
   descriptionSection: {
     marginBottom: '1.5rem',
@@ -678,4 +607,159 @@ const styles = {
   textarea: {
     width: '100%',
     minHeight: '150px',
-    padding: '1
+    padding: '1rem',
+    borderRadius: '0.5rem',
+    border: '1px solid rgba(255, 255, 255, 0.2)',
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    color: '#ffffff',
+    fontSize: '1rem',
+    fontFamily: 'inherit',
+    resize: 'vertical',
+    marginBottom: '1rem',
+    outline: 'none',
+    boxSizing: 'border-box',
+  },
+  analyzeButton: {
+    width: '100%',
+    padding: '1rem',
+    background: 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)',
+    color: 'white',
+    border: 'none',
+    borderRadius: '0.5rem',
+    fontSize: '1.1rem',
+    fontWeight: '700',
+    cursor: 'pointer',
+  },
+  tips: {
+    backgroundColor: 'rgba(102, 126, 234, 0.1)',
+    borderRadius: '0.5rem',
+    padding: '1rem',
+    fontSize: '0.875rem',
+  },
+  loading: {
+    textAlign: 'center',
+    padding: '2rem',
+  },
+  spinner: {
+    width: '3rem',
+    height: '3rem',
+    border: '4px solid #2d3748',
+    borderTop: '4px solid #667eea',
+    borderRadius: '50%',
+    animation: 'spin 1s linear infinite',
+    margin: '0 auto 1rem',
+  },
+  error: {
+    backgroundColor: 'rgba(229, 62, 62, 0.1)',
+    border: '1px solid rgba(229, 62, 62, 0.3)',
+    borderRadius: '0.5rem',
+    padding: '1rem',
+    color: '#feb2b2',
+  },
+  result: {
+    backgroundColor: 'rgba(72, 187, 120, 0.1)',
+    border: '1px solid rgba(72, 187, 120, 0.3)',
+    borderRadius: '0.5rem',
+    padding: '1.5rem',
+  },
+  resultHeader: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: '1rem',
+    color: '#9ae6b4',
+    fontWeight: '600',
+  },
+  timestamp: {
+    fontSize: '0.875rem',
+    opacity: 0.8,
+  },
+  inputSummary: {
+    backgroundColor: 'rgba(0, 0, 0, 0.2)',
+    padding: '0.75rem',
+    borderRadius: '0.5rem',
+    marginBottom: '1rem',
+    fontSize: '0.9rem',
+    fontStyle: 'italic',
+  },
+  resultText: {
+    whiteSpace: 'pre-wrap',
+    fontFamily: 'inherit',
+    fontSize: '1rem',
+    lineHeight: '1.6',
+    margin: '0 0 1rem 0',
+    color: '#e2e8f0',
+  },
+  disclaimer: {
+    backgroundColor: 'rgba(237, 137, 54, 0.1)',
+    border: '1px solid rgba(237, 137, 54, 0.3)',
+    borderRadius: '0.5rem',
+    padding: '1rem',
+    fontSize: '0.875rem',
+    color: '#fbb74d',
+  },
+  chatContainer: {
+    height: '400px',
+    overflowY: 'auto',
+    border: '1px solid rgba(255, 255, 255, 0.1)',
+    borderRadius: '0.5rem',
+    padding: '1rem',
+    marginBottom: '1rem',
+    backgroundColor: 'rgba(0, 0, 0, 0.2)',
+  },
+  chatMessage: {
+    marginBottom: '1rem',
+    display: 'flex',
+  },
+  userMessage: {
+    justifyContent: 'flex-end',
+  },
+  botMessage: {
+    justifyContent: 'flex-start',
+  },
+  messageContent: {
+    maxWidth: '80%',
+    padding: '0.75rem 1rem',
+    borderRadius: '1rem',
+    backgroundColor: '#667eea',
+    wordWrap: 'break-word',
+  },
+  chatForm: {
+    display: 'flex',
+    gap: '0.75rem',
+  },
+  chatInput: {
+    flex: 1,
+    padding: '0.75rem 1rem',
+    border: '1px solid rgba(255, 255, 255, 0.2)',
+    borderRadius: '0.5rem',
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    color: '#ffffff',
+    fontSize: '1rem',
+    outline: 'none',
+  },
+  chatButton: {
+    padding: '0.75rem 1.5rem',
+    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+    color: 'white',
+    border: 'none',
+    borderRadius: '0.5rem',
+    fontSize: '1rem',
+    fontWeight: '600',
+    cursor: 'pointer',
+  },
+  aboutContent: {
+    lineHeight: '1.7',
+  },
+  disclaimerBox: {
+    backgroundColor: 'rgba(237, 137, 54, 0.1)',
+    border: '1px solid rgba(237, 137, 54, 0.3)',
+    borderRadius: '0.5rem',
+    padding: '1rem',
+    marginTop: '1rem',
+    fontSize: '0.9rem',
+    color: '#fbb74d',
+  },
+};
+
+export default App;
