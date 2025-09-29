@@ -120,7 +120,7 @@ function App() {
       };
 
       const response = await fetch(
-        'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=AIzaSyDbVaM34izzzi7I65DbYBsH3ssNIfiSaC0',
+        'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=AIzaSyDf5BI8iUvfsPGVnspZOCdoEF36osNahSg',
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
