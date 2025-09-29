@@ -80,7 +80,7 @@ function App() {
     }
   };
 
-  // CORRECTED AI Analysis function
+  // CORRECTED AI Analysis function with the right model name
   const analyzeImage = async () => {
     if (!image) {
       setError('Please select or capture an image first.');
@@ -94,7 +94,6 @@ function App() {
     try {
       const base64Image = image.split(',')[1];
       
-      // CORRECT payload structure for Gemini API
       const requestBody = {
         contents: [
           {
@@ -115,8 +114,9 @@ function App() {
 
       console.log('Sending request to Gemini API...');
 
+      // FIXED: Using the correct model name - gemini-pro-vision
       const response = await fetch(
-        'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=AIzaSyDHCEaLhGNsVgcbomKHetHRSC-y7nKIHXo',
+        'https://generativelanguage.googleapis.com/v1beta/models/gemini-pro-vision:generateContent?key=AIzaSyDHCEaLhGNsVgcbomKHetHRSC-y7nKIHXo',
         {
           method: 'POST',
           headers: {
@@ -137,7 +137,6 @@ function App() {
       const data = await response.json();
       console.log('API Response:', data);
 
-      // Extract the analysis text
       const analysisText = data?.candidates?.[0]?.content?.parts?.[0]?.text;
       
       if (analysisText) {
@@ -157,7 +156,7 @@ function App() {
     }
   };
 
-  // Chat function
+  // Chat function with correct model
   const sendMessage = async (e) => {
     e.preventDefault();
     if (!message.trim()) return;
@@ -180,8 +179,9 @@ function App() {
         ]
       };
 
+      // FIXED: Using gemini-pro for text-only chat
       const response = await fetch(
-        'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=AIzaSyDHCEaLhGNsVgcbomKHetHRSC-y7nKIHXo',
+        'https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=AIzaSyDHCEaLhGNsVgcbomKHetHRSC-y7nKIHXo',
         {
           method: 'POST',
           headers: {
@@ -437,7 +437,7 @@ function App() {
   );
 }
 
-// Styles
+// Styles (same as before)
 const styles = {
   container: {
     minHeight: '100vh',
