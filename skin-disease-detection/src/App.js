@@ -1,41 +1,85 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef } from 'react';
 
 function App() {
+  const [activeTab, setActiveTab] = useState('scan');
   const [image, setImage] = useState(null);
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState(null);
   const [error, setError] = useState('');
-  const [activeTab, setActiveTab] = useState('diagnosis');
-  const [isCameraActive, setIsCameraActive] = useState(false);
-  const [currentCamera, setCurrentCamera] = useState('environment');
-  const [chatHistory, setChatHistory] = useState([]);
-  const [userMessage, setUserMessage] = useState('');
-  const [isChatting, setIsChatting] = useState(false);
-  
-  const fileRef = useRef(null);
-  const videoRef = useRef(null);
-  const canvasRef = useRef(null);
-  const chatRef = useRef(null);
+  const [apiTest, setApiTest] = useState(null);
 
-  useEffect(() => {
-    setChatHistory([{
-      role: 'bot',
-      text: 'Hello! I am your AI skin health assistant. Ask me about skin conditions!'
-    }]);
-  }, []);
+  const fileInputRef = useRef(null);
 
-  useEffect(() => {
-    if (chatRef.current) {
-      chatRef.current.scrollTop = chatRef.current.scrollHeight;
+  // TEST API FUNCTION - This will tell us exactly what's wrong
+  const testAPI = async () => {
+    setApiTest('Testing API...');
+    
+    try {
+      // Test 1: Basic API connectivity
+      console.log('Testing basic API...');
+      const testResponse = await fetch(
+        'https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=AIzaSyClr14CAWBVITR6oi24fKkHxkPBAuc5pEI',
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: [{
+              parts: [{ text: 'Hello, this is a test. Please respond with "API working successfully".' }]
+            }]
+          })
+        }
+      );
+
+      console.log('Basic API Status:', testResponse.status);
+
+      if (testResponse.ok) {
+        const data = await testResponse.json();
+        console.log('Basic API Response:', data);
+        
+        // Test 2: Check available models
+        console.log('Checking available models...');
+        const modelsResponse = await fetch(
+          'https://generativelanguage.googleapis.com/v1beta/models?key=AIzaSyClr14CAWBVITR6oi24fKkHxkPBAuc5pEI'
+        );
+        
+        if (modelsResponse.ok) {
+          const modelsData = await modelsResponse.json();
+          console.log('Available Models:', modelsData);
+          
+          const visionModels = modelsData.models?.filter(model => 
+            model.name.includes('vision') || 
+            model.supportedGenerationMethods?.includes('generateContent')
+          ) || [];
+          
+          setApiTest(`✅ API Working! 
+          
+Available Models: ${modelsData.models?.length || 0}
+Vision Models Found: ${visionModels.length}
+
+Models: ${modelsData.models?.map(m => m.name).join(', ') || 'None'}
+
+${visionModels.length > 0 ? 'Vision analysis should work!' : 'No vision models - subscription may not include vision API'}`);
+          
+        } else {
+          setApiTest(`✅ Basic API works, but cannot list models. Status: ${modelsResponse.status}`);
+        }
+      } else {
+        const errorData = await testResponse.json();
+        console.error('API Test Failed:', errorData);
+        setApiTest(`❌ API Test Failed: ${errorData.error?.message || 'Unknown error'}`);
+      }
+    } catch (err) {
+      console.error('API Test Error:', err);
+      setApiTest(`❌ Connection Error: ${err.message}`);
     }
-  }, [chatHistory]);
+  };
 
-  const handleFileSelect = (e) => {
-    const file = e.target.files[0];
+  const handleFileSelect = (event) => {
+    const file = event.target.files[0];
     if (file) {
       const reader = new FileReader();
-      reader.onload = (event) => {
-        setImage(event.target.result);
+      reader.onload = (e) => {
+        setImage(e.target.result);
         setResult(null);
         setError('');
       };
@@ -43,568 +87,429 @@ function App() {
     }
   };
 
-  const startCamera = (facingMode) => {
-    if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
-      setIsCameraActive(true);
-      setError('');
-      
-      navigator.mediaDevices.getUserMedia({ 
-        video: { facingMode: facingMode || 'environment' }, 
-        audio: false 
-      })
-        .then(stream => {
-          if (videoRef.current) {
-            videoRef.current.srcObject = stream;
-            videoRef.current.play();
-            setCurrentCamera(facingMode || 'environment');
-          }
-        })
-        .catch(err => {
-          setError('Camera access denied. Please allow camera permissions.');
-          setIsCameraActive(false);
-        });
-    } else {
-      setError('Camera not supported in this browser.');
-    }
-  };
-
-  const switchCamera = () => {
-    if (videoRef.current && videoRef.current.srcObject) {
-      videoRef.current.srcObject.getTracks().forEach(track => track.stop());
-    }
-    const newCamera = currentCamera === 'environment' ? 'user' : 'environment';
-    startCamera(newCamera);
-  };
-
-  const stopCamera = () => {
-    if (videoRef.current && videoRef.current.srcObject) {
-      videoRef.current.srcObject.getTracks().forEach(track => track.stop());
-      setIsCameraActive(false);
-    }
-  };
-
-  const capturePhoto = () => {
-    if (videoRef.current && canvasRef.current) {
-      const context = canvasRef.current.getContext('2d');
-      canvasRef.current.width = videoRef.current.videoWidth;
-      canvasRef.current.height = videoRef.current.videoHeight;
-      context.drawImage(videoRef.current, 0, 0);
-      const capturedImage = canvasRef.current.toDataURL('image/jpeg');
-      setImage(capturedImage);
-      setResult(null);
-      setError('');
-      stopCamera();
-    }
-  };
-
   const analyzeImage = async () => {
     if (!image) {
-      setError('Please select an image first');
+      setError('Please select an image first.');
       return;
     }
 
     setLoading(true);
     setError('');
+    setResult(null);
 
     try {
-      const base64 = image.split(',')[1];
+      const base64Image = image.split(',')[1];
       
-      const data = {
-        contents: [{
-          role: "user",
-          parts: [
-            { text: "Analyze this skin image. Provide disease name, confidence score, description, and medical disclaimer." },
-            { inlineData: { mimeType: "image/jpeg", data: base64 } }
-          ]
-        }]
-      };
-
-      const response = await fetch(
-        'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=AIzaSyClr14CAWBVITR6oi24fKkHxkPBAuc5pEI',
+      // Try the most likely working combinations
+      const attempts = [
         {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(data)
+          url: 'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=AIzaSyClr14CAWBVITR6oi24fKkHxkPBAuc5pEI',
+          model: 'gemini-1.5-flash (v1beta)'
+        },
+        {
+          url: 'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro:generateContent?key=AIzaSyClr14CAWBVITR6oi24fKkHxkPBAuc5pEI',
+          model: 'gemini-1.5-pro (v1beta)'
+        },
+        {
+          url: 'https://generativelanguage.googleapis.com/v1beta/models/gemini-pro-vision:generateContent?key=AIzaSyClr14CAWBVITR6oi24fKkHxkPBAuc5pEI',
+          model: 'gemini-pro-vision (v1beta)'
+        },
+        {
+          url: 'https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=AIzaSyClr14CAWBVITR6oi24fKkHxkPBAuc5pEI',
+          model: 'gemini-1.5-flash (v1)'
         }
-      );
+      ];
 
-      const json = await response.json();
-      
-      if (json.candidates && json.candidates[0]) {
-        const text = json.candidates[0].content.parts[0].text;
-        setResult({ analysis: text, timestamp: new Date().toLocaleString() });
-      } else {
-        setError('No analysis received from AI');
+      let success = false;
+
+      for (const attempt of attempts) {
+        try {
+          console.log(`Trying: ${attempt.model}`);
+          
+          const response = await fetch(attempt.url, {
+            method: 'POST',
+            headers: { 
+              'Content-Type': 'application/json',
+              'x-goog-user-project': '798774183029'
+            },
+            body: JSON.stringify({
+              contents: [{
+                parts: [
+                  {
+                    text: "Analyze this skin image. Provide: 1) What you see 2) Possible skin conditions 3) Recommendations 4) Medical disclaimer"
+                  },
+                  {
+                    inlineData: {
+                      mimeType: "image/jpeg",
+                      data: base64Image
+                    }
+                  }
+                ]
+              }]
+            })
+          });
+
+          console.log(`${attempt.model} Status:`, response.status);
+
+          if (response.ok) {
+            const data = await response.json();
+            console.log(`${attempt.model} Response:`, data);
+            
+            const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+            
+            if (text && text.trim()) {
+              setResult({
+                text: text,
+                model: attempt.model,
+                timestamp: new Date().toLocaleString()
+              });
+              success = true;
+              console.log(`✅ Success with: ${attempt.model}`);
+              break;
+            }
+          } else {
+            const errorData = await response.json();
+            console.log(`❌ ${attempt.model} failed:`, errorData.error?.message);
+          }
+        } catch (err) {
+          console.log(`❌ ${attempt.model} error:`, err.message);
+        }
+      }
+
+      if (!success) {
+        setError(`All attempts failed. Possible issues:
+
+1. **Vision API not enabled**: Your subscription might not include vision models
+2. **API Key permissions**: May need to enable Gemini API in Google Cloud
+3. **Regional restrictions**: Vision API might not be available in your region
+
+Check the browser console (F12) for detailed error messages.`);
       }
 
     } catch (err) {
-      setError('Analysis failed: ' + err.message);
+      setError(`Analysis failed: ${err.message}`);
     } finally {
       setLoading(false);
     }
   };
 
-  const sendMessage = async () => {
-    if (userMessage.trim() === '') return;
-
-    const newMessage = { role: 'user', text: userMessage };
-    setChatHistory(prev => [...prev, newMessage]);
-    setUserMessage('');
-    setIsChatting(true);
-
-    try {
-      const prompt = 'Answer this skin health question: "' + userMessage + '". Provide helpful information but remind users to consult healthcare professionals.';
-      
-      const data = {
-        contents: [{
-          role: "user",
-          parts: [{ text: prompt }]
-        }]
-      };
-
-      const response = await fetch(
-        'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=AIzaSyClr14CAWBVITR6oi24fKkHxkPBAuc5pEI',
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(data)
-        }
-      );
-
-      const json = await response.json();
-      
-      if (json.candidates && json.candidates[0]) {
-        const botMessage = json.candidates[0].content.parts[0].text;
-        setChatHistory(prev => [...prev, { role: 'bot', text: botMessage }]);
-      } else {
-        setChatHistory(prev => [...prev, { role: 'bot', text: 'Sorry, I could not process your question.' }]);
-      }
-
-    } catch (err) {
-      setChatHistory(prev => [...prev, { role: 'bot', text: 'I am experiencing technical difficulties.' }]);
-    } finally {
-      setIsChatting(false);
-    }
-  };
-
-  const isMobile = window.innerWidth <= 768;
-
   return (
-    <div style={{
-      minHeight: '100vh',
-      background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-      padding: '20px',
-      fontFamily: 'Arial, sans-serif'
-    }}>
-      <div style={{ maxWidth: '1200px', margin: '0 auto' }}>
-        
-        <div style={{ textAlign: 'center', marginBottom: '30px', color: 'white' }}>
-          <div style={{ fontSize: '4rem', marginBottom: '10px' }}>🩺</div>
-          <h1 style={{ fontSize: '2.5rem', fontWeight: '800', margin: '0 0 15px 0' }}>
-            Arogya Mitra
-          </h1>
-          <p style={{ fontSize: '1.1rem', opacity: '0.9' }}>
-            AI-Powered Skin Health Analysis & Assistant
-          </p>
-        </div>
+    <div style={styles.container}>
+      <header style={styles.header}>
+        <h1 style={styles.title}>
+          <span style={styles.titlePrimary}>Arogya</span>{' '}
+          <span style={styles.titleSecondary}>Mantra</span>
+        </h1>
+        <p style={styles.subtitle}>AI-Powered Skin Health Analysis</p>
+      </header>
 
-        <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '25px' }}>
-          <div style={{ backgroundColor: 'rgba(255,255,255,0.2)', borderRadius: '15px', padding: '5px' }}>
-            <button
-              onClick={() => setActiveTab('diagnosis')}
-              style={{
-                padding: '12px 25px',
-                borderRadius: '12px',
-                border: 'none',
-                backgroundColor: activeTab === 'diagnosis' ? 'white' : 'transparent',
-                color: activeTab === 'diagnosis' ? '#333' : 'white',
-                fontWeight: '600',
-                cursor: 'pointer',
-                marginRight: '5px'
-              }}
-            >
-              🔬 Skin Analysis
+      {/* API Test Section */}
+      <div style={styles.testSection}>
+        <button onClick={testAPI} style={styles.testButton}>
+          🔧 Test API Connection
+        </button>
+        {apiTest && (
+          <div style={styles.testResult}>
+            <pre>{apiTest}</pre>
+          </div>
+        )}
+      </div>
+
+      <main style={styles.content}>
+        <div style={styles.card}>
+          <div style={styles.cardHeader}>
+            <h3 style={styles.cardTitle}>📸 Image Analysis</h3>
+          </div>
+          
+          <div style={styles.imageContainer}>
+            {image ? (
+              <div style={styles.imagePreview}>
+                <img src={image} alt="Skin for analysis" style={styles.image} />
+                <p style={styles.imageStatus}>✅ Image ready for analysis</p>
+              </div>
+            ) : (
+              <div style={styles.placeholder}>
+                <div style={styles.placeholderIcon}>🖼️</div>
+                <h4>Upload Image for Analysis</h4>
+                <p>Select a clear skin image for AI analysis</p>
+              </div>
+            )}
+          </div>
+
+          <div style={styles.buttonContainer}>
+            <button style={styles.button} onClick={() => fileInputRef.current?.click()}>
+              📁 Upload Image
             </button>
-            <button
-              onClick={() => setActiveTab('chatbot')}
-              style={{
-                padding: '12px 25px',
-                borderRadius: '12px',
-                border: 'none',
-                backgroundColor: activeTab === 'chatbot' ? 'white' : 'transparent',
-                color: activeTab === 'chatbot' ? '#333' : 'white',
-                fontWeight: '600',
-                cursor: 'pointer'
-              }}
+            <button 
+              style={(!image || loading) ? 
+                {...styles.analyzeButton, opacity: 0.6, cursor: 'not-allowed'} : 
+                styles.analyzeButton
+              }
+              onClick={analyzeImage}
+              disabled={!image || loading}
             >
-              🤖 AI Assistant
+              {loading ? '🔄 Analyzing...' : '🧠 Analyze Image'}
             </button>
           </div>
+
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/*"
+            onChange={handleFileSelect}
+            style={{ display: 'none' }}
+          />
         </div>
 
-        {activeTab === 'diagnosis' && (
-          <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: '25px' }}>
+        {(loading || result || error) && (
+          <div style={styles.card}>
+            <h3 style={styles.cardTitle}>📊 Analysis Results</h3>
             
-            <div style={{ backgroundColor: 'white', borderRadius: '20px', padding: '25px' }}>
-              <h2 style={{ fontSize: '1.5rem', fontWeight: '700', textAlign: 'center', marginBottom: '20px' }}>
-                📸 Upload or Capture Image
-              </h2>
-
-              <div style={{
-                border: '3px dashed #ccc',
-                borderRadius: '15px',
-                padding: '25px',
-                textAlign: 'center',
-                marginBottom: '20px',
-                minHeight: '220px',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center'
-              }}>
-                {isCameraActive ? (
-                  <div style={{ width: '100%' }}>
-                    <video 
-                      ref={videoRef} 
-                      style={{ width: '100%', maxHeight: '220px', borderRadius: '10px', objectFit: 'cover' }} 
-                      autoPlay 
-                      playsInline
-                      muted
-                    ></video>
-                    <canvas ref={canvasRef} style={{ display: 'none' }}></canvas>
-                  </div>
-                ) : image ? (
-                  <div>
-                    <img src={image} alt="Preview" style={{ maxWidth: '100%', maxHeight: '220px', borderRadius: '10px' }} />
-                    <p style={{ marginTop: '15px', color: '#10b981', fontWeight: '600' }}>
-                      ✅ Image ready for analysis
-                    </p>
-                  </div>
-                ) : (
-                  <div>
-                    <div style={{ fontSize: '4rem', marginBottom: '15px' }}>📷</div>
-                    <p style={{ fontSize: '1.1rem', color: '#666', fontWeight: '500' }}>
-                      Upload image or use camera
-                    </p>
-                  </div>
-                )}
+            {loading && (
+              <div style={styles.loading}>
+                <div style={styles.spinner}></div>
+                <p>Analyzing with AI...</p>
               </div>
+            )}
 
-              <input type="file" accept="image/*" onChange={handleFileSelect} ref={fileRef} style={{ display: 'none' }} />
-
-              {isCameraActive ? (
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '10px', marginBottom: '20px' }}>
-                  <button
-                    onClick={capturePhoto}
-                    style={{
-                      background: '#ef4444',
-                      color: 'white',
-                      border: 'none',
-                      padding: '12px',
-                      borderRadius: '10px',
-                      cursor: 'pointer',
-                      fontWeight: '600',
-                      fontSize: '0.9rem'
-                    }}
-                  >
-                    📸 Capture
-                  </button>
-                  <button
-                    onClick={switchCamera}
-                    style={{
-                      background: '#8b5cf6',
-                      color: 'white',
-                      border: 'none',
-                      padding: '12px',
-                      borderRadius: '10px',
-                      cursor: 'pointer',
-                      fontWeight: '600',
-                      fontSize: '0.9rem'
-                    }}
-                  >
-                    🔄 Flip
-                  </button>
-                  <button
-                    onClick={stopCamera}
-                    style={{
-                      background: '#6b7280',
-                      color: 'white',
-                      border: 'none',
-                      padding: '12px',
-                      borderRadius: '10px',
-                      cursor: 'pointer',
-                      fontWeight: '600',
-                      fontSize: '0.9rem'
-                    }}
-                  >
-                    ❌ Close
-                  </button>
-                </div>
-              ) : (
-                <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr 1fr' : '1fr 1fr 1fr', gap: '10px', marginBottom: '20px' }}>
-                  <button
-                    onClick={() => fileRef.current.click()}
-                    style={{
-                      background: '#10b981',
-                      color: 'white',
-                      border: 'none',
-                      padding: '14px',
-                      borderRadius: '10px',
-                      cursor: 'pointer',
-                      fontWeight: '600'
-                    }}
-                  >
-                    📁 Upload
-                  </button>
-                  <button
-                    onClick={() => startCamera('environment')}
-                    style={{
-                      background: '#3b82f6',
-                      color: 'white',
-                      border: 'none',
-                      padding: '14px',
-                      borderRadius: '10px',
-                      cursor: 'pointer',
-                      fontWeight: '600'
-                    }}
-                  >
-                    📷 Camera
-                  </button>
-                  {!isMobile && (
-                    <button
-                      onClick={analyzeImage}
-                      disabled={!image || loading}
-                      style={{
-                        background: loading || !image ? '#ccc' : '#667eea',
-                        color: 'white',
-                        border: 'none',
-                        padding: '14px',
-                        borderRadius: '10px',
-                        cursor: loading || !image ? 'not-allowed' : 'pointer',
-                        fontWeight: '600'
-                      }}
-                    >
-                      {loading ? '🔍 Analyzing...' : '🧠 Analyze'}
-                    </button>
-                  )}
-                </div>
-              )}
-
-              {isMobile && !isCameraActive && (
-                <button
-                  onClick={analyzeImage}
-                  disabled={!image || loading}
-                  style={{
-                    background: loading || !image ? '#ccc' : '#667eea',
-                    color: 'white',
-                    border: 'none',
-                    padding: '16px',
-                    borderRadius: '12px',
-                    cursor: loading || !image ? 'not-allowed' : 'pointer',
-                    fontWeight: '600',
-                    fontSize: '1.1rem',
-                    width: '100%',
-                    marginBottom: '20px'
-                  }}
-                >
-                  {loading ? '🔍 Analyzing...' : '🧠 Analyze with AI'}
-                </button>
-              )}
-
-              <div style={{ padding: '15px', backgroundColor: '#fffbeb', borderRadius: '10px' }}>
-                <h4 style={{ color: '#92400e', marginBottom: '10px' }}>💡 Tips:</h4>
-                <ul style={{ fontSize: '0.9rem', color: '#78350f', paddingLeft: '20px' }}>
-                  <li>Use good lighting</li>
-                  <li>Keep image clear and focused</li>
-                  <li>Show affected area clearly</li>
-                </ul>
+            {error && (
+              <div style={styles.error}>
+                <h4>⚠️ Analysis Error</h4>
+                <pre style={styles.errorText}>{error}</pre>
               </div>
-            </div>
+            )}
 
-            {(result || error || loading) && (
-              <div style={{ backgroundColor: 'white', borderRadius: '20px', padding: '25px' }}>
-                {loading && (
-                  <div style={{ textAlign: 'center', padding: '40px' }}>
-                    <div style={{ fontSize: '3rem', marginBottom: '15px' }}>🔍</div>
-                    <h3>AI is analyzing...</h3>
+            {result && (
+              <div style={styles.result}>
+                <div style={styles.resultHeader}>
+                  <span>✅ Analysis Complete</span>
+                  <div style={styles.resultMeta}>
+                    <span style={styles.model}>Model: {result.model}</span>
+                    <span style={styles.timestamp}>{result.timestamp}</span>
                   </div>
-                )}
-
-                {error && (
-                  <div style={{ backgroundColor: '#fef2f2', padding: '20px', borderRadius: '10px', textAlign: 'center' }}>
-                    <div style={{ fontSize: '3rem', marginBottom: '15px' }}>❌</div>
-                    <h3 style={{ color: '#dc2626' }}>Error</h3>
-                    <p style={{ color: '#7f1d1d' }}>{error}</p>
-                  </div>
-                )}
-
-                {result && (
-                  <div>
-                    <div style={{ textAlign: 'center', marginBottom: '20px' }}>
-                      <div style={{ fontSize: '3rem', marginBottom: '10px' }}>📊</div>
-                      <h2 style={{ color: '#059669' }}>Analysis Complete</h2>
-                    </div>
-                    <div style={{ backgroundColor: '#f0fdf4', padding: '20px', borderRadius: '10px', marginBottom: '15px' }}>
-                      <pre style={{
-                        whiteSpace: 'pre-wrap',
-                        fontFamily: 'Georgia, serif',
-                        fontSize: '1rem',
-                        lineHeight: '1.6',
-                        margin: 0
-                      }}>
-                        {result.analysis}
-                      </pre>
-                    </div>
-                    <div style={{ fontSize: '0.9rem', color: '#666', textAlign: 'right', marginBottom: '15px' }}>
-                      🕒 {result.timestamp}
-                    </div>
-                    <div style={{ backgroundColor: '#fef3c7', padding: '15px', borderRadius: '10px' }}>
-                      <h4 style={{ color: '#92400e' }}>⚠️ Medical Disclaimer</h4>
-                      <p style={{ color: '#78350f', fontSize: '0.9rem' }}>
-                        This analysis is for educational purposes only. Always consult a healthcare professional.
-                      </p>
-                    </div>
-                  </div>
-                )}
+                </div>
+                <pre style={styles.resultText}>{result.text}</pre>
+                <div style={styles.disclaimer}>
+                  <strong>⚕️ Disclaimer:</strong> This analysis is for educational purposes only. Always consult healthcare professionals for medical diagnosis and treatment.
+                </div>
               </div>
             )}
           </div>
         )}
-
-        {activeTab === 'chatbot' && (
-          <div style={{ backgroundColor: 'white', borderRadius: '20px', padding: '25px', maxWidth: '800px', margin: '0 auto' }}>
-            <div style={{ textAlign: 'center', marginBottom: '20px' }}>
-              <div style={{ fontSize: '3rem', marginBottom: '10px' }}>🤖</div>
-              <h2>AI Skin Health Assistant</h2>
-              <p style={{ color: '#666' }}>Ask me about skin conditions and treatments</p>
-            </div>
-
-            <div 
-              ref={chatRef}
-              style={{
-                height: '350px',
-                overflowY: 'auto',
-                border: '2px solid #e5e7eb',
-                borderRadius: '15px',
-                padding: '20px',
-                marginBottom: '20px',
-                backgroundColor: '#f9fafb'
-              }}
-            >
-              {chatHistory.map((msg, index) => (
-                <div 
-                  key={index} 
-                  style={{
-                    display: 'flex',
-                    justifyContent: msg.role === 'user' ? 'flex-end' : 'flex-start',
-                    marginBottom: '15px'
-                  }}
-                >
-                  <div style={{
-                    maxWidth: '75%',
-                    padding: '12px 16px',
-                    borderRadius: '18px',
-                    backgroundColor: msg.role === 'user' ? '#667eea' : '#e5e7eb',
-                    color: msg.role === 'user' ? 'white' : '#333',
-                    wordWrap: 'break-word'
-                  }}>
-                    {msg.text}
-                  </div>
-                </div>
-              ))}
-              
-              {isChatting && (
-                <div style={{ display: 'flex', justifyContent: 'flex-start' }}>
-                  <div style={{
-                    padding: '12px 16px',
-                    borderRadius: '18px',
-                    backgroundColor: '#e5e7eb',
-                    color: '#333'
-                  }}>
-                    Typing...
-                  </div>
-                </div>
-              )}
-            </div>
-
-            <div style={{ display: 'flex', gap: '15px' }}>
-              <input
-                type="text"
-                value={userMessage}
-                onChange={(e) => setUserMessage(e.target.value)}
-                onKeyPress={(e) => e.key === 'Enter' && sendMessage()}
-                placeholder="Ask about skin conditions..."
-                disabled={isChatting}
-                style={{
-                  flex: 1,
-                  padding: '12px 18px',
-                  border: '2px solid #e5e7eb',
-                  borderRadius: '25px',
-                  fontSize: '1rem',
-                  outline: 'none'
-                }}
-              />
-              <button
-                onClick={sendMessage}
-                disabled={isChatting || userMessage.trim() === ''}
-                style={{
-                  background: isChatting || userMessage.trim() === '' ? '#ccc' : '#667eea',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '50%',
-                  width: '48px',
-                  height: '48px',
-                  cursor: isChatting || userMessage.trim() === '' ? 'not-allowed' : 'pointer',
-                  fontSize: '1.2rem'
-                }}
-              >
-                🚀
-              </button>
-            </div>
-
-            <div style={{ marginTop: '20px', padding: '15px', backgroundColor: '#f0f9ff', borderRadius: '10px' }}>
-              <h4 style={{ color: '#0369a1', marginBottom: '10px' }}>💬 Try asking:</h4>
-              <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: '8px' }}>
-                <button
-                  onClick={() => setUserMessage('What causes acne?')}
-                  style={{
-                    padding: '8px 12px',
-                    backgroundColor: 'white',
-                    border: '1px solid #bae6fd',
-                    borderRadius: '8px',
-                    cursor: 'pointer',
-                    color: '#0369a1',
-                    textAlign: 'left',
-                    fontSize: '0.9rem'
-                  }}
-                >
-                  What causes acne?
-                </button>
-                <button
-                  onClick={() => setUserMessage('How to care for dry skin?')}
-                  style={{
-                    padding: '8px 12px',
-                    backgroundColor: 'white',
-                    border: '1px solid #bae6fd',
-                    borderRadius: '8px',
-                    cursor: 'pointer',
-                    color: '#0369a1',
-                    textAlign: 'left',
-                    fontSize: '0.9rem'
-                  }}
-                >
-                  Dry skin care tips?
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-
-        <div style={{ textAlign: 'center', marginTop: '40px', color: 'rgba(255,255,255,0.8)' }}>
-          <p>Made with ❤️ using Google Gemini AI</p>
-        </div>
-      </div>
+      </main>
     </div>
   );
 }
+
+const styles = {
+  container: {
+    minHeight: '100vh',
+    backgroundColor: '#0a0b0d',
+    color: '#ffffff',
+    fontFamily: 'system-ui, -apple-system, sans-serif',
+  },
+  header: {
+    textAlign: 'center',
+    padding: '2rem 1rem',
+    background: 'linear-gradient(135deg, #1a1d23 0%, #2d3748 100%)',
+  },
+  title: {
+    fontSize: 'clamp(2rem, 5vw, 3.5rem)',
+    fontWeight: '900',
+    margin: '0 0 0.5rem 0',
+  },
+  titlePrimary: {
+    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+    WebkitBackgroundClip: 'text',
+    WebkitTextFillColor: 'transparent',
+  },
+  titleSecondary: {
+    background: 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)',
+    WebkitBackgroundClip: 'text',
+    WebkitTextFillColor: 'transparent',
+  },
+  subtitle: {
+    fontSize: '1.1rem',
+    opacity: 0.9,
+    margin: '0',
+    color: '#a0aec0',
+  },
+  testSection: {
+    textAlign: 'center',
+    padding: '1rem',
+    maxWidth: '800px',
+    margin: '0 auto',
+  },
+  testButton: {
+    padding: '0.75rem 1.5rem',
+    backgroundColor: '#667eea',
+    color: 'white',
+    border: 'none',
+    borderRadius: '0.5rem',
+    fontSize: '1rem',
+    fontWeight: '600',
+    cursor: 'pointer',
+    marginBottom: '1rem',
+  },
+  testResult: {
+    backgroundColor: 'rgba(255, 255, 255, 0.03)',
+    border: '1px solid rgba(255, 255, 255, 0.1)',
+    borderRadius: '0.5rem',
+    padding: '1rem',
+    textAlign: 'left',
+    fontSize: '0.9rem',
+    lineHeight: '1.4',
+  },
+  content: {
+    maxWidth: '800px',
+    margin: '0 auto',
+    padding: '1rem',
+  },
+  card: {
+    backgroundColor: 'rgba(255, 255, 255, 0.03)',
+    borderRadius: '1rem',
+    padding: '1.5rem',
+    border: '1px solid rgba(255, 255, 255, 0.1)',
+    backdropFilter: 'blur(10px)',
+    marginBottom: '1.5rem',
+  },
+  cardHeader: {
+    marginBottom: '1.5rem',
+  },
+  cardTitle: {
+    fontSize: '1.5rem',
+    fontWeight: '700',
+    margin: '0',
+    color: '#667eea',
+  },
+  imageContainer: {
+    border: '2px dashed #4a5568',
+    borderRadius: '1rem',
+    padding: '2rem',
+    textAlign: 'center',
+    minHeight: '250px',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: '1.5rem',
+  },
+  placeholder: {
+    color: '#718096',
+  },
+  placeholderIcon: {
+    fontSize: '3rem',
+    marginBottom: '1rem',
+  },
+  imagePreview: {
+    textAlign: 'center',
+  },
+  image: {
+    maxWidth: '100%',
+    maxHeight: '300px',
+    borderRadius: '0.5rem',
+    marginBottom: '1rem',
+  },
+  imageStatus: {
+    color: '#48bb78',
+    fontWeight: '600',
+  },
+  buttonContainer: {
+    display: 'flex',
+    gap: '1rem',
+    justifyContent: 'center',
+    flexWrap: 'wrap',
+  },
+  button: {
+    padding: '0.75rem 1.5rem',
+    backgroundColor: '#4a5568',
+    color: 'white',
+    border: 'none',
+    borderRadius: '0.5rem',
+    fontSize: '1rem',
+    fontWeight: '600',
+    cursor: 'pointer',
+    minWidth: '120px',
+  },
+  analyzeButton: {
+    background: 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)',
+    padding: '0.75rem 1.5rem',
+    color: 'white',
+    border: 'none',
+    borderRadius: '0.5rem',
+    fontSize: '1rem',
+    fontWeight: '700',
+    cursor: 'pointer',
+    minWidth: '120px',
+  },
+  loading: {
+    textAlign: 'center',
+    padding: '2rem',
+  },
+  spinner: {
+    width: '3rem',
+    height: '3rem',
+    border: '4px solid #2d3748',
+    borderTop: '4px solid #667eea',
+    borderRadius: '50%',
+    animation: 'spin 1s linear infinite',
+    margin: '0 auto 1rem',
+  },
+  error: {
+    backgroundColor: 'rgba(229, 62, 62, 0.1)',
+    border: '1px solid rgba(229, 62, 62, 0.3)',
+    borderRadius: '0.5rem',
+    padding: '1.5rem',
+    color: '#feb2b2',
+  },
+  errorText: {
+    whiteSpace: 'pre-wrap',
+    fontFamily: 'inherit',
+    fontSize: '0.9rem',
+    margin: '0.5rem 0',
+  },
+  result: {
+    backgroundColor: 'rgba(72, 187, 120, 0.1)',
+    border: '1px solid rgba(72, 187, 120, 0.3)',
+    borderRadius: '0.5rem',
+    padding: '1.5rem',
+  },
+  resultHeader: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: '1rem',
+    color: '#9ae6b4',
+    fontWeight: '600',
+  },
+  resultMeta: {
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'flex-end',
+    fontSize: '0.85rem',
+  },
+  model: {
+    opacity: 0.8,
+    marginBottom: '0.25rem',
+  },
+  timestamp: {
+    opacity: 0.7,
+  },
+  resultText: {
+    whiteSpace: 'pre-wrap',
+    fontFamily: 'inherit',
+    fontSize: '1rem',
+    lineHeight: '1.6',
+    margin: '0 0 1rem 0',
+    color: '#e2e8f0',
+  },
+  disclaimer: {
+    backgroundColor: 'rgba(237, 137, 54, 0.1)',
+    border: '1px solid rgba(237, 137, 54, 0.3)',
+    borderRadius: '0.5rem',
+    padding: '1rem',
+    fontSize: '0.875rem',
+    color: '#fbb74d',
+  },
+};
 
 export default App;
