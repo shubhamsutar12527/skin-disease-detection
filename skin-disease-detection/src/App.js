@@ -80,7 +80,7 @@ function App() {
     }
   };
 
-  // AI Analysis function with your new API key
+  // AI Analysis function with your NEW API key
   const analyzeImage = async () => {
     if (!image) {
       setError('Please select or capture an image first.');
@@ -95,16 +95,15 @@ function App() {
       const base64Image = image.split(',')[1];
       const requestBody = {
         contents: [{
-          role: 'user',
           parts: [
             { text: 'Analyze this skin image for potential conditions. Provide: 1) Possible condition name 2) Confidence level (0-100%) 3) Brief description 4) Recommended actions. Always include medical disclaimer.' },
-            { inlineData: { mimeType: 'image/jpeg', data: base64Image } }
+            { inline_data: { mime_type: 'image/jpeg', data: base64Image } }
           ]
         }]
       };
 
       const response = await fetch(
-        'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=AIzaSyDHCEaLhGNsVgcbomKHetHRSC-y7nKIHXo',
+        'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=AIzaSyAndhAs2KngwAb1-Obid8R5FgXKF1gpfns',
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -112,11 +111,17 @@ function App() {
         }
       );
 
+      console.log('Response status:', response.status);
+
       if (!response.ok) {
-        throw new Error(`API Error: ${response.status}`);
+        const errorText = await response.text();
+        console.log('Error response:', errorText);
+        throw new Error(`HTTP ${response.status}: ${errorText}`);
       }
 
       const data = await response.json();
+      console.log('API Response:', data);
+      
       const analysisText = data?.candidates?.[0]?.content?.parts?.[0]?.text;
       
       if (analysisText) {
@@ -128,13 +133,14 @@ function App() {
         setError('No analysis result received. Please try again.');
       }
     } catch (err) {
+      console.error('Analysis error:', err);
       setError(`Analysis failed: ${err.message}`);
     } finally {
       setLoading(false);
     }
   };
 
-  // Chat function with your new API key
+  // Chat function with your NEW API key
   const sendMessage = async (e) => {
     e.preventDefault();
     if (!message.trim()) return;
@@ -147,13 +153,12 @@ function App() {
     try {
       const requestBody = {
         contents: [{
-          role: 'user',
           parts: [{ text: `You are a helpful health assistant. Answer this question clearly and concisely: "${userMessage}". Always remind users to consult healthcare professionals for serious concerns.` }]
         }]
       };
 
       const response = await fetch(
-        'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=AIzaSyDHCEaLhGNsVgcbomKHetHRSC-y7nKIHXo',
+        'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=AIzaSyAndhAs2KngwAb1-Obid8R5FgXKF1gpfns',
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
