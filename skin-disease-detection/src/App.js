@@ -1,268 +1,610 @@
-import React, { useRef, useState } from "react";
+import React, { useState, useRef, useEffect } from 'react';
 
 function App() {
-  // Tabs
-  const [tab, setTab] = useState("scan");
-
-  // Scan states
   const [image, setImage] = useState(null);
-  const [result, setResult] = useState("");
   const [loading, setLoading] = useState(false);
-
-  // Camera
-  const [cameraOn, setCameraOn] = useState(false);
-  const [facing, setFacing] = useState("environment");
+  const [result, setResult] = useState(null);
+  const [error, setError] = useState('');
+  const [activeTab, setActiveTab] = useState('diagnosis');
+  const [isCameraActive, setIsCameraActive] = useState(false);
+  const [currentCamera, setCurrentCamera] = useState('environment');
+  const [chatHistory, setChatHistory] = useState([]);
+  const [userMessage, setUserMessage] = useState('');
+  const [isChatting, setIsChatting] = useState(false);
+  
+  const fileRef = useRef(null);
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
-  const fileRef = useRef(null);
+  const chatRef = useRef(null);
 
-  // Chat
-  const [msg, setMsg] = useState("");
-  const [chat, setChat] = useState([
-    { from: "bot", text: "Arogya Mantra is online. Ask a question or scan an image." }
-  ]);
+  useEffect(() => {
+    setChatHistory([{
+      role: 'bot',
+      text: 'Hello! I am your AI skin health assistant. Ask me about skin conditions!'
+    }]);
+  }, []);
 
-  // Pick file
-  function pickFile() {
-    if (fileRef.current) fileRef.current.value = "";
-    fileRef.current.click();
-  }
-  function onFileChange(e) {
-    const f = e.target.files && e.target.files[0];
-    if (!f) return;
-    const reader = new FileReader();
-    reader.onload = (ev) => { setImage(ev.target.result); setResult(""); };
-    reader.readAsDataURL(f);
-  }
+  useEffect(() => {
+    if (chatRef.current) {
+      chatRef.current.scrollTop = chatRef.current.scrollHeight;
+    }
+  }, [chatHistory]);
 
-  // Camera
-  function startCamera() {
-    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-      alert("Camera not supported in this browser.");
+  const handleFileSelect = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        setImage(event.target.result);
+        setResult(null);
+        setError('');
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const startCamera = (facingMode) => {
+    if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+      setIsCameraActive(true);
+      setError('');
+      
+      navigator.mediaDevices.getUserMedia({ 
+        video: { facingMode: facingMode || 'environment' }, 
+        audio: false 
+      })
+        .then(stream => {
+          if (videoRef.current) {
+            videoRef.current.srcObject = stream;
+            videoRef.current.play();
+            setCurrentCamera(facingMode || 'environment');
+          }
+        })
+        .catch(err => {
+          setError('Camera access denied. Please allow camera permissions.');
+          setIsCameraActive(false);
+        });
+    } else {
+      setError('Camera not supported in this browser.');
+    }
+  };
+
+  const switchCamera = () => {
+    if (videoRef.current && videoRef.current.srcObject) {
+      videoRef.current.srcObject.getTracks().forEach(track => track.stop());
+    }
+    const newCamera = currentCamera === 'environment' ? 'user' : 'environment';
+    startCamera(newCamera);
+  };
+
+  const stopCamera = () => {
+    if (videoRef.current && videoRef.current.srcObject) {
+      videoRef.current.srcObject.getTracks().forEach(track => track.stop());
+      setIsCameraActive(false);
+    }
+  };
+
+  const capturePhoto = () => {
+    if (videoRef.current && canvasRef.current) {
+      const context = canvasRef.current.getContext('2d');
+      canvasRef.current.width = videoRef.current.videoWidth;
+      canvasRef.current.height = videoRef.current.videoHeight;
+      context.drawImage(videoRef.current, 0, 0);
+      const capturedImage = canvasRef.current.toDataURL('image/jpeg');
+      setImage(capturedImage);
+      setResult(null);
+      setError('');
+      stopCamera();
+    }
+  };
+
+  const analyzeImage = async () => {
+    if (!image) {
+      setError('Please select an image first');
       return;
     }
-    setCameraOn(true);
-    navigator.mediaDevices.getUserMedia({ video: { facingMode: facing } })
-      .then((stream) => {
-        if (videoRef.current) videoRef.current.srcObject = stream;
-      })
-      .catch(() => {
-        alert("Camera permission denied.");
-        setCameraOn(false);
-      });
-  }
-  function stopCamera() {
-    setCameraOn(false);
-    const s = videoRef.current && videoRef.current.srcObject;
-    if (s) s.getTracks().forEach(t => t.stop());
-  }
-  function flipCamera() {
-    stopCamera();
-    const next = facing === "user" ? "environment" : "user";
-    setFacing(next);
-    setTimeout(startCamera, 150);
-  }
-  function capture() {
-    const v = videoRef.current, c = canvasRef.current;
-    if (!v || !c) return;
-    c.width = v.videoWidth; c.height = v.videoHeight;
-    c.getContext("2d").drawImage(v, 0, 0);
-    const data = c.toDataURL("image/jpeg");
-    setImage(data);
-    setResult("");
-    stopCamera();
-  }
 
-  // Analyze with Gemini
-  async function analyze() {
-    if (!image) return;
-    setLoading(true); setResult("");
+    setLoading(true);
+    setError('');
+
     try {
-      const base64 = image.split(",")[1];
-      const payload = {
+      const base64 = image.split(',')[1];
+      
+      const data = {
         contents: [{
           role: "user",
           parts: [
-            { text: "Analyze this skin image and return: disease name, confidence (0-100), description, and short medical disclaimer." },
+            { text: "Analyze this skin image. Provide disease name, confidence score, description, and medical disclaimer." },
             { inlineData: { mimeType: "image/jpeg", data: base64 } }
           ]
         }]
       };
-      const res = await fetch(
-        "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=AIzaSyDbVaM34izzzi7I65DbYBsH3ssNIfiSaC0",
-        { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) }
-      );
-      const json = await res.json();
-      const text = json && json.candidates && json.candidates[0] && json.candidates[0].content &&
-                   json.candidates[0].content.parts && json.candidates[0].content.parts[0] &&
-                   json.candidates[0].content.parts[0].text;
-      setResult(text || "No analysis returned. Try another image.");
-    } catch (e) {
-      setResult("Error contacting AI. Try again.");
-    }
-    setLoading(false);
-  }
 
-  // Chat
-  async function send(e) {
-    e && e.preventDefault();
-    const t = msg.trim();
-    if (!t) return;
-    setChat((c) => c.concat({ from: "user", text: t }));
-    setMsg("");
+      const response = await fetch(
+        'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=AIzaSyDbVaM34izzzi7I65DbYBsH3ssNIfiSaC0',
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(data)
+        }
+      );
+
+      const json = await response.json();
+      
+      if (json.candidates && json.candidates[0]) {
+        const text = json.candidates[0].content.parts[0].text;
+        setResult({ analysis: text, timestamp: new Date().toLocaleString() });
+      } else {
+        setError('No analysis received from AI');
+      }
+
+    } catch (err) {
+      setError('Analysis failed: ' + err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const sendMessage = async () => {
+    if (userMessage.trim() === '') return;
+
+    const newMessage = { role: 'user', text: userMessage };
+    setChatHistory(prev => [...prev, newMessage]);
+    setUserMessage('');
+    setIsChatting(true);
+
     try {
-      const payload = { contents: [{ role: "user", parts: [{ text: "Q: " + t + "\nA:" }] }] };
-      const res = await fetch(
-        "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=AIzaSyDbVaM34izzzi7I65DbYBsH3ssNIfiSaC0",
-        { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) }
-      );
-      const json = await res.json();
-      const text = json && json.candidates && json.candidates[0] &&
-                   json.candidates[0].content && json.candidates[0].content.parts &&
-                   json.candidates[0].content.parts[0] && json.candidates[0].content.parts[0].text;
-      setChat((c) => c.concat({ from: "bot", text: text || "Sorry, no response." }));
-    } catch {
-      setChat((c) => c.concat({ from: "bot", text: "Network error." }));
-    }
-  }
+      const prompt = 'Answer this skin health question: "' + userMessage + '". Provide helpful information but remind users to consult healthcare professionals.';
+      
+      const data = {
+        contents: [{
+          role: "user",
+          parts: [{ text: prompt }]
+        }]
+      };
 
-  // UI helpers
-  const Wrap = (p) => <div style={{maxWidth:880,margin:"0 auto",padding:16}} {...p} />;
-  const Card = (p) => <section style={{
-    background:"#12161b", border:"1px solid #263340", borderRadius:14,
-    padding:18, boxShadow:"0 0 22px #0b0f14", ...p.style
-  }}>{p.children}</section>;
+      const response = await fetch(
+        'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=AIzaSyDbVaM34izzzi7I65DbYBsH3ssNIfiSaC0',
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(data)
+        }
+      );
+
+      const json = await response.json();
+      
+      if (json.candidates && json.candidates[0]) {
+        const botMessage = json.candidates[0].content.parts[0].text;
+        setChatHistory(prev => [...prev, { role: 'bot', text: botMessage }]);
+      } else {
+        setChatHistory(prev => [...prev, { role: 'bot', text: 'Sorry, I could not process your question.' }]);
+      }
+
+    } catch (err) {
+      setChatHistory(prev => [...prev, { role: 'bot', text: 'I am experiencing technical difficulties.' }]);
+    } finally {
+      setIsChatting(false);
+    }
+  };
+
+  const isMobile = window.innerWidth <= 768;
 
   return (
-    <div style={{ minHeight:"100vh", background:"#07090c", color:"#e9fbff", fontFamily:"Inter,system-ui,Segoe UI,Arial,sans-serif" }}>
-      <Wrap>
-        {/* Header */}
-        <header style={{textAlign:"center", margin:"34px 0 20px"}}>
-          <div style={{fontSize:44,fontWeight:900,letterSpacing:.6}}>
-            <span style={{color:"#ffffff",textShadow:"0 0 10px #fff"}}>Arogya</span>{" "}
-            <span style={{color:"#2ef4a6",textShadow:"0 0 16px #19ffd1,0 0 30px rgba(25,255,209,.6)"}}>Mantra</span>
-          </div>
-          <div style={{opacity:.85}}>AI Skin Health Interface</div>
-          <div style={{height:2,width:180,margin:"16px auto 0",background:"linear-gradient(90deg,#22d3ee,#2ef4a6)",boxShadow:"0 0 14px #22d3ee"}} />
-        </header>
-
-        {/* Tabs */}
-        <div style={{display:"flex",justifyContent:"center",gap:10,margin:"22px 0"}}>
-          <button onClick={()=>setTab("scan")} style={tabBtn(tab==="scan")}>🔬 Scan</button>
-          <button onClick={()=>setTab("chat")} style={tabBtn(tab==="chat")}>🤖 Assistant</button>
+    <div style={{
+      minHeight: '100vh',
+      background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+      padding: '20px',
+      fontFamily: 'Arial, sans-serif'
+    }}>
+      <div style={{ maxWidth: '1200px', margin: '0 auto' }}>
+        
+        <div style={{ textAlign: 'center', marginBottom: '30px', color: 'white' }}>
+          <div style={{ fontSize: '4rem', marginBottom: '10px' }}>🩺</div>
+          <h1 style={{ fontSize: '2.5rem', fontWeight: '800', margin: '0 0 15px 0' }}>
+            Arogya Mitra
+          </h1>
+          <p style={{ fontSize: '1.1rem', opacity: '0.9' }}>
+            AI-Powered Skin Health Analysis & Assistant
+          </p>
         </div>
 
-        {/* Scan tab */}
-        {tab==="scan" && (
-          <div>
-            <Card style={{maxWidth:520, margin:"0 auto 14px"}}>
-              <div style={{border:"2px dashed #2ef4a6",borderRadius:12,minHeight:220,background:"#0e1216",
-                           display:"flex",alignItems:"center",justifyContent:"center", padding:8}}>
-                {cameraOn ? (
-                  <div style={{width:"100%"}}>
-                    <video ref={videoRef} autoPlay playsInline muted style={{width:"100%",borderRadius:10}} />
-                    <canvas ref={canvasRef} style={{display:"none"}} />
+        <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '25px' }}>
+          <div style={{ backgroundColor: 'rgba(255,255,255,0.2)', borderRadius: '15px', padding: '5px' }}>
+            <button
+              onClick={() => setActiveTab('diagnosis')}
+              style={{
+                padding: '12px 25px',
+                borderRadius: '12px',
+                border: 'none',
+                backgroundColor: activeTab === 'diagnosis' ? 'white' : 'transparent',
+                color: activeTab === 'diagnosis' ? '#333' : 'white',
+                fontWeight: '600',
+                cursor: 'pointer',
+                marginRight: '5px'
+              }}
+            >
+              🔬 Skin Analysis
+            </button>
+            <button
+              onClick={() => setActiveTab('chatbot')}
+              style={{
+                padding: '12px 25px',
+                borderRadius: '12px',
+                border: 'none',
+                backgroundColor: activeTab === 'chatbot' ? 'white' : 'transparent',
+                color: activeTab === 'chatbot' ? '#333' : 'white',
+                fontWeight: '600',
+                cursor: 'pointer'
+              }}
+            >
+              🤖 AI Assistant
+            </button>
+          </div>
+        </div>
+
+        {activeTab === 'diagnosis' && (
+          <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: '25px' }}>
+            
+            <div style={{ backgroundColor: 'white', borderRadius: '20px', padding: '25px' }}>
+              <h2 style={{ fontSize: '1.5rem', fontWeight: '700', textAlign: 'center', marginBottom: '20px' }}>
+                📸 Upload or Capture Image
+              </h2>
+
+              <div style={{
+                border: '3px dashed #ccc',
+                borderRadius: '15px',
+                padding: '25px',
+                textAlign: 'center',
+                marginBottom: '20px',
+                minHeight: '220px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center'
+              }}>
+                {isCameraActive ? (
+                  <div style={{ width: '100%' }}>
+                    <video 
+                      ref={videoRef} 
+                      style={{ width: '100%', maxHeight: '220px', borderRadius: '10px', objectFit: 'cover' }} 
+                      autoPlay 
+                      playsInline
+                      muted
+                    ></video>
+                    <canvas ref={canvasRef} style={{ display: 'none' }}></canvas>
                   </div>
                 ) : image ? (
-                  <img src={image} alt="preview" style={{maxWidth:"100%",maxHeight:260,borderRadius:10}} />
+                  <div>
+                    <img src={image} alt="Preview" style={{ maxWidth: '100%', maxHeight: '220px', borderRadius: '10px' }} />
+                    <p style={{ marginTop: '15px', color: '#10b981', fontWeight: '600' }}>
+                      ✅ Image ready for analysis
+                    </p>
+                  </div>
                 ) : (
-                  <div style={{opacity:.9,textAlign:"center"}}>
-                    <div style={{fontSize:38,marginBottom:10}}>📷</div>
-                    <div>Upload image or use camera</div>
+                  <div>
+                    <div style={{ fontSize: '4rem', marginBottom: '15px' }}>📷</div>
+                    <p style={{ fontSize: '1.1rem', color: '#666', fontWeight: '500' }}>
+                      Upload image or use camera
+                    </p>
                   </div>
                 )}
               </div>
 
-              <div style={{display:"flex",gap:10,flexWrap:"wrap",marginTop:14}}>
-                {!cameraOn ? (
-                  <>
-                    <button onClick={pickFile} style={actionBtn("#38bdf8")}>📁 Load</button>
-                    <input ref={fileRef} type="file" accept="image/*" onChange={onFileChange} style={{display:"none"}} />
-                    <button onClick={startCamera} style={actionBtn("#2ef4a6")}>🎥 Camera</button>
-                    <button onClick={analyze} disabled={!image||loading}
-                            style={{...actionBtn("#0ea5e9"),opacity:(!image||loading)?0.6:1,cursor:(!image||loading)?"not-allowed":"pointer"}}>
-                      {loading ? "Analyzing..." : "🧠 Analyze"}
+              <input type="file" accept="image/*" onChange={handleFileSelect} ref={fileRef} style={{ display: 'none' }} />
+
+              {isCameraActive ? (
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '10px', marginBottom: '20px' }}>
+                  <button
+                    onClick={capturePhoto}
+                    style={{
+                      background: '#ef4444',
+                      color: 'white',
+                      border: 'none',
+                      padding: '12px',
+                      borderRadius: '10px',
+                      cursor: 'pointer',
+                      fontWeight: '600',
+                      fontSize: '0.9rem'
+                    }}
+                  >
+                    📸 Capture
+                  </button>
+                  <button
+                    onClick={switchCamera}
+                    style={{
+                      background: '#8b5cf6',
+                      color: 'white',
+                      border: 'none',
+                      padding: '12px',
+                      borderRadius: '10px',
+                      cursor: 'pointer',
+                      fontWeight: '600',
+                      fontSize: '0.9rem'
+                    }}
+                  >
+                    🔄 Flip
+                  </button>
+                  <button
+                    onClick={stopCamera}
+                    style={{
+                      background: '#6b7280',
+                      color: 'white',
+                      border: 'none',
+                      padding: '12px',
+                      borderRadius: '10px',
+                      cursor: 'pointer',
+                      fontWeight: '600',
+                      fontSize: '0.9rem'
+                    }}
+                  >
+                    ❌ Close
+                  </button>
+                </div>
+              ) : (
+                <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr 1fr' : '1fr 1fr 1fr', gap: '10px', marginBottom: '20px' }}>
+                  <button
+                    onClick={() => fileRef.current.click()}
+                    style={{
+                      background: '#10b981',
+                      color: 'white',
+                      border: 'none',
+                      padding: '14px',
+                      borderRadius: '10px',
+                      cursor: 'pointer',
+                      fontWeight: '600'
+                    }}
+                  >
+                    📁 Upload
+                  </button>
+                  <button
+                    onClick={() => startCamera('environment')}
+                    style={{
+                      background: '#3b82f6',
+                      color: 'white',
+                      border: 'none',
+                      padding: '14px',
+                      borderRadius: '10px',
+                      cursor: 'pointer',
+                      fontWeight: '600'
+                    }}
+                  >
+                    📷 Camera
+                  </button>
+                  {!isMobile && (
+                    <button
+                      onClick={analyzeImage}
+                      disabled={!image || loading}
+                      style={{
+                        background: loading || !image ? '#ccc' : '#667eea',
+                        color: 'white',
+                        border: 'none',
+                        padding: '14px',
+                        borderRadius: '10px',
+                        cursor: loading || !image ? 'not-allowed' : 'pointer',
+                        fontWeight: '600'
+                      }}
+                    >
+                      {loading ? '🔍 Analyzing...' : '🧠 Analyze'}
                     </button>
-                  </>
-                ) : (
-                  <>
-                    <button onClick={capture} style={actionBtn("#ef4444")}>📸 Capture</button>
-                    <button onClick={flipCamera} style={actionBtn("#22d3ee")}>🔄 Flip</button>
-                    <button onClick={stopCamera} style={actionBtn("#64748b")}>⛔ Close</button>
-                  </>
+                  )}
+                </div>
+              )}
+
+              {isMobile && !isCameraActive && (
+                <button
+                  onClick={analyzeImage}
+                  disabled={!image || loading}
+                  style={{
+                    background: loading || !image ? '#ccc' : '#667eea',
+                    color: 'white',
+                    border: 'none',
+                    padding: '16px',
+                    borderRadius: '12px',
+                    cursor: loading || !image ? 'not-allowed' : 'pointer',
+                    fontWeight: '600',
+                    fontSize: '1.1rem',
+                    width: '100%',
+                    marginBottom: '20px'
+                  }}
+                >
+                  {loading ? '🔍 Analyzing...' : '🧠 Analyze with AI'}
+                </button>
+              )}
+
+              <div style={{ padding: '15px', backgroundColor: '#fffbeb', borderRadius: '10px' }}>
+                <h4 style={{ color: '#92400e', marginBottom: '10px' }}>💡 Tips:</h4>
+                <ul style={{ fontSize: '0.9rem', color: '#78350f', paddingLeft: '20px' }}>
+                  <li>Use good lighting</li>
+                  <li>Keep image clear and focused</li>
+                  <li>Show affected area clearly</li>
+                </ul>
+              </div>
+            </div>
+
+            {(result || error || loading) && (
+              <div style={{ backgroundColor: 'white', borderRadius: '20px', padding: '25px' }}>
+                {loading && (
+                  <div style={{ textAlign: 'center', padding: '40px' }}>
+                    <div style={{ fontSize: '3rem', marginBottom: '15px' }}>🔍</div>
+                    <h3>AI is analyzing...</h3>
+                  </div>
+                )}
+
+                {error && (
+                  <div style={{ backgroundColor: '#fef2f2', padding: '20px', borderRadius: '10px', textAlign: 'center' }}>
+                    <div style={{ fontSize: '3rem', marginBottom: '15px' }}>❌</div>
+                    <h3 style={{ color: '#dc2626' }}>Error</h3>
+                    <p style={{ color: '#7f1d1d' }}>{error}</p>
+                  </div>
+                )}
+
+                {result && (
+                  <div>
+                    <div style={{ textAlign: 'center', marginBottom: '20px' }}>
+                      <div style={{ fontSize: '3rem', marginBottom: '10px' }}>📊</div>
+                      <h2 style={{ color: '#059669' }}>Analysis Complete</h2>
+                    </div>
+                    <div style={{ backgroundColor: '#f0fdf4', padding: '20px', borderRadius: '10px', marginBottom: '15px' }}>
+                      <pre style={{
+                        whiteSpace: 'pre-wrap',
+                        fontFamily: 'Georgia, serif',
+                        fontSize: '1rem',
+                        lineHeight: '1.6',
+                        margin: 0
+                      }}>
+                        {result.analysis}
+                      </pre>
+                    </div>
+                    <div style={{ fontSize: '0.9rem', color: '#666', textAlign: 'right', marginBottom: '15px' }}>
+                      🕒 {result.timestamp}
+                    </div>
+                    <div style={{ backgroundColor: '#fef3c7', padding: '15px', borderRadius: '10px' }}>
+                      <h4 style={{ color: '#92400e' }}>⚠️ Medical Disclaimer</h4>
+                      <p style={{ color: '#78350f', fontSize: '0.9rem' }}>
+                        This analysis is for educational purposes only. Always consult a healthcare professional.
+                      </p>
+                    </div>
+                  </div>
                 )}
               </div>
-
-              <div style={{marginTop:10,fontSize:13,background:"#161a20",padding:"8px 12px",borderRadius:8,color:"#9afae7"}}>
-                Tip: Bright, soft light and a steady close shot improve results.
-              </div>
-            </Card>
-
-            {result && (
-              <Card style={{maxWidth:520, margin:"0 auto 14px", color:"#bffdf4"}}>
-                <div style={{fontWeight:700, marginBottom:6}}>Analysis</div>
-                <pre style={{whiteSpace:"pre-wrap", margin:0, fontFamily:"inherit"}}>{result}</pre>
-              </Card>
             )}
-
-            <Card style={{maxWidth:520, margin:"0 auto 18px", background:"#12161b"}}>
-              <div style={{fontWeight:700, marginBottom:6}}>About</div>
-              <ul style={{margin:0,paddingLeft:18,opacity:.95}}>
-                <li>Helps understand common skin conditions from a photo.</li>
-                <li>Educational support only; not a medical diagnosis.</li>
-                <li>No images are stored by the app.</li>
-                <li>See a clinician for serious or uncertain cases.</li>
-              </ul>
-            </Card>
           </div>
         )}
 
-        {/* Chat tab */}
-        {tab==="chat" && (
-          <Card style={{maxWidth:560, margin:"0 auto"}}>
-            <div style={{fontWeight:700, marginBottom:8}}>Skin Health Assistant</div>
-            <div style={{minHeight:200,maxHeight:320,overflowY:"auto",background:"#0f1318",borderRadius:8,padding:"8px 6px", marginBottom:10}}>
-              {chat.map((m,i)=>(
-                <div key={i} style={{textAlign:m.from==="user"?"right":"left",margin:"8px 0"}}>
-                  <span style={{
-                    display:"inline-block", maxWidth:"78%", wordBreak:"break-word",
-                    background: m.from==="user" ? "linear-gradient(90deg,#2ef4a6,#22d3ee 70%)" : "#1c222a",
-                    color: m.from==="user" ? "#0b1511" : "#c9fff6",
-                    padding:"8px 12px", borderRadius:8, boxShadow: m.from==="user" ? "0 0 10px #18f8c8" : "0 0 8px #0b1116"
-                  }}>{m.text}</span>
+        {activeTab === 'chatbot' && (
+          <div style={{ backgroundColor: 'white', borderRadius: '20px', padding: '25px', maxWidth: '800px', margin: '0 auto' }}>
+            <div style={{ textAlign: 'center', marginBottom: '20px' }}>
+              <div style={{ fontSize: '3rem', marginBottom: '10px' }}>🤖</div>
+              <h2>AI Skin Health Assistant</h2>
+              <p style={{ color: '#666' }}>Ask me about skin conditions and treatments</p>
+            </div>
+
+            <div 
+              ref={chatRef}
+              style={{
+                height: '350px',
+                overflowY: 'auto',
+                border: '2px solid #e5e7eb',
+                borderRadius: '15px',
+                padding: '20px',
+                marginBottom: '20px',
+                backgroundColor: '#f9fafb'
+              }}
+            >
+              {chatHistory.map((msg, index) => (
+                <div 
+                  key={index} 
+                  style={{
+                    display: 'flex',
+                    justifyContent: msg.role === 'user' ? 'flex-end' : 'flex-start',
+                    marginBottom: '15px'
+                  }}
+                >
+                  <div style={{
+                    maxWidth: '75%',
+                    padding: '12px 16px',
+                    borderRadius: '18px',
+                    backgroundColor: msg.role === 'user' ? '#667eea' : '#e5e7eb',
+                    color: msg.role === 'user' ? 'white' : '#333',
+                    wordWrap: 'break-word'
+                  }}>
+                    {msg.text}
+                  </div>
                 </div>
               ))}
+              
+              {isChatting && (
+                <div style={{ display: 'flex', justifyContent: 'flex-start' }}>
+                  <div style={{
+                    padding: '12px 16px',
+                    borderRadius: '18px',
+                    backgroundColor: '#e5e7eb',
+                    color: '#333'
+                  }}>
+                    Typing...
+                  </div>
+                </div>
+              )}
             </div>
-            <form onSubmit={send} style={{display:"flex",gap:8}}>
-              <input value={msg} onChange={(e)=>setMsg(e.target.value)} placeholder="Ask about symptoms, care, sunscreen..."
-                     style={{flex:1,padding:"10px 12px",borderRadius:8,border:"2px solid #22d3ee"}} />
-              <button type="submit" style={{padding:"0 18px",borderRadius:8,border:"none",
-                background:"linear-gradient(90deg,#2ef4a6,#22d3ee 70%)", color:"#081412", fontWeight:800, cursor:"pointer"}}>Send</button>
-            </form>
-          </Card>
+
+            <div style={{ display: 'flex', gap: '15px' }}>
+              <input
+                type="text"
+                value={userMessage}
+                onChange={(e) => setUserMessage(e.target.value)}
+                onKeyPress={(e) => e.key === 'Enter' && sendMessage()}
+                placeholder="Ask about skin conditions..."
+                disabled={isChatting}
+                style={{
+                  flex: 1,
+                  padding: '12px 18px',
+                  border: '2px solid #e5e7eb',
+                  borderRadius: '25px',
+                  fontSize: '1rem',
+                  outline: 'none'
+                }}
+              />
+              <button
+                onClick={sendMessage}
+                disabled={isChatting || userMessage.trim() === ''}
+                style={{
+                  background: isChatting || userMessage.trim() === '' ? '#ccc' : '#667eea',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '50%',
+                  width: '48px',
+                  height: '48px',
+                  cursor: isChatting || userMessage.trim() === '' ? 'not-allowed' : 'pointer',
+                  fontSize: '1.2rem'
+                }}
+              >
+                🚀
+              </button>
+            </div>
+
+            <div style={{ marginTop: '20px', padding: '15px', backgroundColor: '#f0f9ff', borderRadius: '10px' }}>
+              <h4 style={{ color: '#0369a1', marginBottom: '10px' }}>💬 Try asking:</h4>
+              <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: '8px' }}>
+                <button
+                  onClick={() => setUserMessage('What causes acne?')}
+                  style={{
+                    padding: '8px 12px',
+                    backgroundColor: 'white',
+                    border: '1px solid #bae6fd',
+                    borderRadius: '8px',
+                    cursor: 'pointer',
+                    color: '#0369a1',
+                    textAlign: 'left',
+                    fontSize: '0.9rem'
+                  }}
+                >
+                  What causes acne?
+                </button>
+                <button
+                  onClick={() => setUserMessage('How to care for dry skin?')}
+                  style={{
+                    padding: '8px 12px',
+                    backgroundColor: 'white',
+                    border: '1px solid #bae6fd',
+                    borderRadius: '8px',
+                    cursor: 'pointer',
+                    color: '#0369a1',
+                    textAlign: 'left',
+                    fontSize: '0.9rem'
+                  }}
+                >
+                  Dry skin care tips?
+                </button>
+              </div>
+            </div>
+          </div>
         )}
-      </Wrap>
+
+        <div style={{ textAlign: 'center', marginTop: '40px', color: 'rgba(255,255,255,0.8)' }}>
+          <p>Made with ❤️ using Google Gemini AI</p>
+        </div>
+      </div>
     </div>
   );
-}
-
-/* Styles helpers */
-function tabBtn(active) {
-  return {
-    background: active ? "#141921" : "#22252a",
-    color: active ? "#2ef4a6" : "#e4fdfe",
-    border: active ? "2px solid #2ef4a6" : "2px solid #222a2e",
-    fontWeight:800, fontSize:16, padding:"10px 18px", borderRadius:8,
-    boxShadow: active ? "0 0 12px #27f6c4" : undefined,
-    cursor:"pointer"
-  };
-}
-function actionBtn(color) {
-  return {
-    background: "linear-gradient(100deg,"+color+",#0f2021 88%)",
-    color:"#f5fefc", fontWeight:700, borderRadius:8, border:"none",
-    boxShadow:"0 0 10px "+color, padding:"12px 16px", fontSize:15, cursor:"pointer"
-  };
 }
 
 export default App;
